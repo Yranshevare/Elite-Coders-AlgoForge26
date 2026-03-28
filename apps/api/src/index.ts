@@ -2,6 +2,8 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { auth } from "./core/lib/auth/init.js";
 import { cors } from "hono/cors";
+import analyzedomain from "./routes/analyzedomain.js";
+
 import "dotenv/config";
 
 const app = new Hono<{
@@ -37,6 +39,7 @@ const app = new Hono<{
   .on(["POST", "GET"], "/auth/*", async (c) => {
     return auth.handler(c.req.raw);
   })
+  .route("/analyzedomain", analyzedomain);
 
 serve(
   {
