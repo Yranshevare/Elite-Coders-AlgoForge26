@@ -2,6 +2,8 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { auth } from "./core/lib/auth/init.js";
 import { cors } from "hono/cors";
+import analyzedomain from "./routes/analyzedomain.js";
+
 import { Resend } from "resend";
 import { Redis } from "@upstash/redis";
 import { randomInt } from "crypto";
@@ -146,7 +148,8 @@ const app = new Hono<{
   })
   .on(["POST", "GET"], "/auth/*", async (c) => {
     return auth.handler(c.req.raw);
-  });
+  })
+  .route("/analyzedomain", analyzedomain);
 
 function calculateRiskScore(
   subject: string,

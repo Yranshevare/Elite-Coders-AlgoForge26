@@ -110,6 +110,9 @@ importers:
       uuid:
         specifier: ^13.0.0
         version: 13.0.0
+      whois-node-json:
+        specifier: ^0.0.8
+        version: 0.0.8
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -6359,6 +6362,9 @@ packages:
     engines: {node: '>= 8'}
     hasBin: true
 
+  whois-node-json@0.0.8:
+    resolution: {integrity: sha512-nwSeaH5fSRGLYT3uUoFpn8gT52bLTfLVmzSnasPqVyAyGsnvgGYBCQJz3XIoPG9OpgA4WrLDykIfYjP3vA8LwA==}
+
   why-is-node-running@2.3.0:
     resolution: {integrity: sha512-hUrmaWBdVDcxvYqnyh09zunKzROWjbZTiNy8dBEjkS7ehEDQibXJ7XvlmtbwuTclUiIyN+CyXQD4Vmko8fNm8w==}
     engines: {node: '>=8'}
@@ -12448,6 +12454,8 @@ snapshots:
   which@2.0.2:
     dependencies:
       isexe: 2.0.0
+
+  whois-node-json@0.0.8: {}
 
   why-is-node-running@2.3.0:
     dependencies:
