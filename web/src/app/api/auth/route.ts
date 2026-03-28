@@ -97,7 +97,7 @@ export async function POST(request: Request) {
       if (!currentUser.isVerified) {
         await db
           .update(user)
-          .set({ isVerified: true })
+          .set({ isVerified: 1 })
           .where(eq(user.id, currentUser.id));
       }
 
