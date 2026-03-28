@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { organization } from "better-auth/plugins";
+import { emailOTP } from "better-auth/plugins";
 import { db } from "../../../core/db/client.js";
 import { member as memberSchema, user } from "../../../core/db/schema/index.js";
 import { eq } from "drizzle-orm";
@@ -13,6 +13,7 @@ export const auth = betterAuth({
     "http://localhost:3000",
     "http://localhost:3001",
     "http://localhost:5173",
+    "chrome-extension://*",
   ],
   database: drizzleAdapter(db, {
     provider: "pg",
@@ -20,11 +21,7 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     autoSignIn: true,
-    requireEmailVerification: true,
-    sendResetPassword: async ({ user, url }) => {
-      // send email
-    },
-    resetPasswordTokenExpiresIn: 3600,
+    requireEmailVerification: false,
   },
   socialProviders: {
     google: {
@@ -32,18 +29,28 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     },
   },
-  emailVerification: {
-    sendOnSignUp: true,
-    autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user, token }) => {
-      const verificationUrl = `${process.env.BETTER_AUTH_URL}/api/auth/verify-email?token=${token}&callbackURL=${process.env.FRONTEND_URL}/dashboard`;
-      await sendEmail({
-        from: process.env.RESEND_EMAIL!,
-        to: user.email,
-        subject: "Verify your email",
-        html: `<div>Hi ${user.name}, please verify your email by clicking <a href="${verificationUrl}">here</a></div>`,
-      });
-    },
-  },
-  plugins: [],
+  plugins: [
+    emailOTP({
+      async sendVerificationOTP({ email, otp, type }) {
+        await sendEmail({
+          from: process.env.RESEND_EMAIL || "noreply@trustinbox.com",
+          to: email,
+          subject:
+            type === "sign-in"
+              ? "Your TrustInBox Sign-In Code"
+              : type === "email-verification"
+                ? "Verify Your Email"
+                : "Reset Your Password",
+          html: `
+            <div style="font-family: sans-serif; padding: 20px;">
+              <h2>Your Verification Code</h2>
+              <p>Your code is: <strong style="font-size: 24px; letter-spacing: 4px;">${otp}</strong></p>
+              <p>This code expires in 5 minutes.</p>
+              <p>If you didn't request this, please ignore this email.</p>
+            </div>
+          `,
+        });
+      },
+    }),
+  ],
 });
