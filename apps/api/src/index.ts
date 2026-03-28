@@ -36,7 +36,7 @@ const app = new Hono<{
   })
   .on(["POST", "GET"], "/auth/*", async (c) => {
     return auth.handler(c.req.raw);
-  });
+  })
 
 serve(
   {
