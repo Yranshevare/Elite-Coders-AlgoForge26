@@ -9,12 +9,10 @@ export default defineEnv({
 
   client: {
     NEXT_PUBLIC_API_BASE_URL: z.string(),
-    NEXT_PUBLIC_MARKETING_URL: z.string(),
   },
 
   env: {
     ...process.env,
     NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
-    NEXT_PUBLIC_MARKETING_URL: process.env.NEXT_PUBLIC_MARKETING_URL,
   },
 });
