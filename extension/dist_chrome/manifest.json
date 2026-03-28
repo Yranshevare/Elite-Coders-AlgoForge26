@@ -30,10 +30,14 @@
     "http://localhost:3000/*",
     "https://your-production-domain.com/*"
   ],
+  "background": {
+    "service_worker": "service-worker-loader.js",
+    "type": "module"
+  },
   "content_scripts": [
     {
       "js": [
-        "assets/index.prod.tsx-CKvogqei.js"
+        "assets/index.prod.tsx-_jmS8G5m.js"
       ],
       "matches": [
         "<all_urls>"
@@ -49,14 +53,10 @@
         "*.js",
         "*.css",
         "public/*",
-        "assets/index.prod.tsx-CKvogqei.js"
+        "assets/index.prod.tsx-_jmS8G5m.js"
       ],
       "use_dynamic_url": false
     }
   ],
-  "options_page": "src/options/index.html",
-  "background": {
-    "service_worker": "service-worker-loader.js",
-    "type": "module"
-  }
+  "options_page": "src/options/index.html"
 }

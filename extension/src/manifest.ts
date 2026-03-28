@@ -31,6 +31,10 @@ export default defineManifest({
   },
   permissions: ['activeTab', 'storage', 'sidePanel', 'scripting'],
   host_permissions: ['http://localhost:3000/*', 'https://your-production-domain.com/*'],
+  background: {
+    service_worker: 'src/background/index.ts',
+    type: 'module',
+  },
   content_scripts: [
     {
       js: isDev

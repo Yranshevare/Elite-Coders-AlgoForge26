@@ -189,6 +189,19 @@ export default function SidePanel() {
     if (authStatus === "logged-in" && !emailData && !isLoading) extractEmail();
   }, [authStatus]);
 
+  // Auto-start analysis when email data is loaded
+  useEffect(() => {
+    if (
+      authStatus === "logged-in" &&
+      emailData &&
+      emailData.links?.length > 0 &&
+      !showAnalysis &&
+      !analyzingDomain
+    ) {
+      handleAnalyseEmail();
+    }
+  }, [authStatus, emailData]);
+
   const extractDomain = (url: string): string | null => {
     try {
       return new URL(url).hostname;
