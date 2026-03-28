@@ -1,0 +1,89 @@
+{
+  "../../../../../@crx/manifest": {
+    "file": "assets/crx-manifest.js-A02l5Whq.js",
+    "name": "crx-manifest.js",
+    "src": "../../../../../@crx/manifest",
+    "isEntry": true
+  },
+  "_createShadowRoot-B1wrPxX7.js": {
+    "file": "assets/createShadowRoot-B1wrPxX7.js",
+    "name": "createShadowRoot",
+    "assets": [
+      "assets/fonts/Inter-Black.ttf",
+      "assets/fonts/Inter-ExtraBold.ttf",
+      "assets/fonts/Inter-Bold.ttf",
+      "assets/fonts/Inter-SemiBold.ttf",
+      "assets/fonts/Inter-Medium.ttf",
+      "assets/fonts/Inter-Regular.ttf",
+      "assets/fonts/Inter-Light.ttf",
+      "assets/fonts/Inter-ExtraLight.ttf",
+      "assets/fonts/Inter-Thin.ttf"
+    ]
+  },
+  "src/assets/fonts/Inter-Black.ttf": {
+    "file": "assets/fonts/Inter-Black.ttf",
+    "src": "src/assets/fonts/Inter-Black.ttf"
+  },
+  "src/assets/fonts/Inter-Bold.ttf": {
+    "file": "assets/fonts/Inter-Bold.ttf",
+    "src": "src/assets/fonts/Inter-Bold.ttf"
+  },
+  "src/assets/fonts/Inter-ExtraBold.ttf": {
+    "file": "assets/fonts/Inter-ExtraBold.ttf",
+    "src": "src/assets/fonts/Inter-ExtraBold.ttf"
+  },
+  "src/assets/fonts/Inter-ExtraLight.ttf": {
+    "file": "assets/fonts/Inter-ExtraLight.ttf",
+    "src": "src/assets/fonts/Inter-ExtraLight.ttf"
+  },
+  "src/assets/fonts/Inter-Light.ttf": {
+    "file": "assets/fonts/Inter-Light.ttf",
+    "src": "src/assets/fonts/Inter-Light.ttf"
+  },
+  "src/assets/fonts/Inter-Medium.ttf": {
+    "file": "assets/fonts/Inter-Medium.ttf",
+    "src": "src/assets/fonts/Inter-Medium.ttf"
+  },
+  "src/assets/fonts/Inter-Regular.ttf": {
+    "file": "assets/fonts/Inter-Regular.ttf",
+    "src": "src/assets/fonts/Inter-Regular.ttf"
+  },
+  "src/assets/fonts/Inter-SemiBold.ttf": {
+    "file": "assets/fonts/Inter-SemiBold.ttf",
+    "src": "src/assets/fonts/Inter-SemiBold.ttf"
+  },
+  "src/assets/fonts/Inter-Thin.ttf": {
+    "file": "assets/fonts/Inter-Thin.ttf",
+    "src": "src/assets/fonts/Inter-Thin.ttf"
+  },
+  "src/background/index.ts": {
+    "file": "assets/index.ts-BCyoFyXb.js",
+    "name": "index.ts",
+    "src": "src/background/index.ts",
+    "isEntry": true
+  },
+  "src/content/index.prod.tsx": {
+    "file": "assets/index.prod.tsx-CKvogqei.js",
+    "name": "index.prod.tsx",
+    "src": "src/content/index.prod.tsx",
+    "isEntry": true
+  },
+  "src/options/index.html": {
+    "file": "assets/index.html-metyIrcP.js",
+    "name": "index.html",
+    "src": "src/options/index.html",
+    "isEntry": true,
+    "imports": [
+      "_createShadowRoot-B1wrPxX7.js"
+    ]
+  },
+  "src/sidePanel/index.html": {
+    "file": "assets/index.html-_8xBp_zK.js",
+    "name": "index.html",
+    "src": "src/sidePanel/index.html",
+    "isEntry": true,
+    "imports": [
+      "_createShadowRoot-B1wrPxX7.js"
+    ]
+  }
+}

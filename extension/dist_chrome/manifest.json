@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "Chrome Extension Starter",
+  "version": "1.2.0",
+  "description": "Get started with building your dream Chrome extension effortlessly! Our starter kit combines the power of cutting-edge technologies like Vite, TypeScript, React, CRX, Tailwind CSS, and DaisyUI, making extension development a breeze.",
+  "action": {
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "src/sidePanel/index.html"
+  },
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "permissions": [
+    "activeTab",
+    "storage",
+    "sidePanel",
+    "scripting"
+  ],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "https://your-production-domain.com/*"
+  ],
+  "content_scripts": [
+    {
+      "js": [
+        "assets/index.prod.tsx-CKvogqei.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "resources": [
+        "*.js",
+        "*.css",
+        "public/*",
+        "assets/index.prod.tsx-CKvogqei.js"
+      ],
+      "use_dynamic_url": false
+    }
+  ],
+  "options_page": "src/options/index.html",
+  "background": {
+    "service_worker": "service-worker-loader.js",
+    "type": "module"
+  }
+}
