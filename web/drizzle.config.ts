@@ -4,11 +4,11 @@ import "dotenv/config";
 console.log(process.env.DATABASE_URL);
 
 export default {
-	schema: "./src/lib/db/schemas/index.ts",
-	out: "./drizzle",
-	dialect: "postgresql",
-	dbCredentials: {
-		url: process.env.DATABASE_URL ?? "",
-	},
-	verbose: true,
+  schema: "./src/lib/db/schema/index.ts",
+  out: "./drizzle",
+  dialect: "postgresql",
+  dbCredentials: {
+    url: process.env.DATABASE_URL!,
+  },
+  verbose: true,
 } satisfies Config;

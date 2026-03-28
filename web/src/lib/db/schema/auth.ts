@@ -1,4 +1,11 @@
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -22,10 +29,24 @@ export const otp = pgTable("otp", {
   expiresAt: timestamp("expiresAt").notNull(),
 });
 
+export interface predictions {
+  error: boolean;
+  prediction: "bad" | "good";
+  raw: {
+    good: number;
+    bad: number;
+  };
+  status: string;
+}
+
 export const predictions = pgTable("predictions", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("userId").notNull(),
-
+  metadata: jsonb("metadata").notNull().$type<predictions>(),
+  sender: text("sender"),
+  emailSubject: text("emailSubject"),
+  body: text("body"),
+  attachments: jsonb("attachments"),
 });
 
 export type User = typeof user.$inferSelect;
