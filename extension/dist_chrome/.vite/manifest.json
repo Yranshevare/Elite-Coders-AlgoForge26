@@ -5,8 +5,8 @@
     "src": "../../../../../@crx/manifest",
     "isEntry": true
   },
-  "_createShadowRoot-5XeV0bTh.js": {
-    "file": "assets/createShadowRoot-5XeV0bTh.js",
+  "_createShadowRoot-BYVNpdZz.js": {
+    "file": "assets/createShadowRoot-BYVNpdZz.js",
     "name": "createShadowRoot",
     "assets": [
       "assets/fonts/Inter-Black.ttf",
@@ -57,33 +57,33 @@
     "src": "src/assets/fonts/Inter-Thin.ttf"
   },
   "src/background/index.ts": {
-    "file": "assets/index.ts-CE_0NSuo.js",
+    "file": "assets/index.ts-CdN53xW6.js",
     "name": "index.ts",
     "src": "src/background/index.ts",
     "isEntry": true
   },
   "src/content/index.prod.tsx": {
-    "file": "assets/index.prod.tsx-CHuKL3Ve.js",
+    "file": "assets/index.prod.tsx-CoGo-qUx.js",
     "name": "index.prod.tsx",
     "src": "src/content/index.prod.tsx",
     "isEntry": true
   },
   "src/options/index.html": {
-    "file": "assets/index.html-Cyp3Wtlz.js",
+    "file": "assets/index.html-CUN565DB.js",
     "name": "index.html",
     "src": "src/options/index.html",
     "isEntry": true,
     "imports": [
-      "_createShadowRoot-5XeV0bTh.js"
+      "_createShadowRoot-BYVNpdZz.js"
     ]
   },
   "src/sidePanel/index.html": {
-    "file": "assets/index.html-C8rygW41.js",
+    "file": "assets/index.html-p3VsCgZ-.js",
     "name": "index.html",
     "src": "src/sidePanel/index.html",
     "isEntry": true,
     "imports": [
-      "_createShadowRoot-5XeV0bTh.js"
+      "_createShadowRoot-BYVNpdZz.js"
     ]
   }
 }

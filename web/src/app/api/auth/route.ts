@@ -13,7 +13,7 @@ const JWT_SECRET = new TextEncoder().encode(
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
   "Access-Control-Allow-Credentials": "true",
 };
@@ -138,6 +138,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   } catch (error) {
     console.error("Auth error:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE() {
+  try {
+    const cookieStore = await cookies();
+    cookieStore.delete("auth_token");
+    return jsonResponse({ success: true });
+  } catch (error) {
+    console.error("Logout error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

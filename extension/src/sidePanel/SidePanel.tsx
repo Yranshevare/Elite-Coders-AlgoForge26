@@ -34,12 +34,11 @@ type UrlAnalysisResult = {
 
 const THEME = {
   primary: "#6366f1",
-  primaryHover: "#4f46e5",
   bg: "#f8fafc",
   surface: "#ffffff",
-  border: "#e2e8f0",
-  textMain: "#0f172a",
-  textSec: "#475569",
+  border: "#f1f5f9",
+  textMain: "#1e293b",
+  textSec: "#64748b",
   textMute: "#94a3b8",
   safe: "#10b981",
   safeBg: "rgba(16,185,129,0.08)",
@@ -47,24 +46,49 @@ const THEME = {
   warnBg: "rgba(245,158,11,0.08)",
   danger: "#ef4444",
   dangerBg: "rgba(239,68,68,0.08)",
+  fontStack:
+    "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
 };
 
-const verdictStyles = {
-  SAFE: { color: THEME.safe, bg: THEME.safeBg, icon: "🛡️" },
-  SUSPICIOUS: { color: THEME.warn, bg: THEME.warnBg, icon: "⚠️" },
-  PHISHING: { color: THEME.danger, bg: THEME.dangerBg, icon: "🚨" },
+const verdictMeta = {
+  SAFE: {
+    color: THEME.safe,
+    bg: THEME.safeBg,
+    icon: "🛡️",
+    label: "Trusted",
+    score: 98,
+    desc: "This email appears secure.",
+  },
+  SUSPICIOUS: {
+    color: THEME.warn,
+    bg: THEME.warnBg,
+    icon: "⚠️",
+    label: "Review",
+    score: 45,
+    desc: "Potential risks identified.",
+  },
+  PHISHING: {
+    color: THEME.danger,
+    bg: THEME.dangerBg,
+    icon: "🚨",
+    label: "Danger",
+    score: 12,
+    desc: "High probability of phishing.",
+  },
 };
 
 function Spinner({ size = 18, color = THEME.primary }) {
   return (
-    <div style={{
-      width: size,
-      height: size,
-      border: `2.5px solid ${color}22`,
-      borderTopColor: color,
-      borderRadius: "50%",
-      animation: "ti-spin 0.8s linear infinite",
-    }} />
+    <div
+      style={{
+        width: size,
+        height: size,
+        border: `2px solid ${color}22`,
+        borderTopColor: color,
+        borderRadius: "50%",
+        animation: "ti-spin 0.8s linear infinite",
+      }}
+    />
   );
 }
 
@@ -72,13 +96,17 @@ export default function SidePanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
-  const [authStatus, setAuthStatus] = useState<"unknown" | "logged-out" | "otp-sent" | "logged-in">("unknown");
+  const [authStatus, setAuthStatus] = useState<
+    "unknown" | "logged-out" | "otp-sent" | "logged-in"
+  >("unknown");
   const [message, setMessage] = useState("");
   const [emailData, setEmailData] = useState<EmailData>(null);
   const [userId, setUserId] = useState("");
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [analyzingDomain, setAnalyzingDomain] = useState<string | null>(null);
   const [urlResults, setUrlResults] = useState<UrlAnalysisResult[]>([]);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
+  const [activeTab, setActiveTab] = useState<"scan" | "sender">("scan");
 
   useEffect(() => {
     (async () => {
@@ -94,15 +122,44 @@ export default function SidePanel() {
     })();
   }, []);
 
+  // Listen for navigation messages from background
   useEffect(() => {
-    if (authStatus === "logged-in" && !emailData && !isLoading) extractEmail();
+    const handleMessage = (msg: any) => {
+      if (msg.action === "navigatedToInbox") {
+        // Programmatically close the side panel when navigating to inbox
+        window.close();
+      } else if (msg.action === "navigatedToEmail") {
+        resetState();
+        extractEmail();
+      }
+    };
+    chrome.runtime.onMessage.addListener(handleMessage);
+    return () => chrome.runtime.onMessage.removeListener(handleMessage);
   }, [authStatus]);
 
   useEffect(() => {
-    if (authStatus === "logged-in" && emailData && emailData.links?.length > 0 && !showAnalysis && !analyzingDomain) {
+    if (authStatus === "logged-in" && !emailData && !isLoading) extractEmail();
+  }, [authStatus, emailData]);
+
+  useEffect(() => {
+    if (
+      authStatus === "logged-in" &&
+      emailData &&
+      emailData.links?.length > 0 &&
+      !showAnalysis &&
+      !analyzingDomain
+    ) {
       handleAnalyseEmail();
     }
   }, [authStatus, emailData]);
+
+  const resetState = () => {
+    setEmailData(null);
+    setShowAnalysis(false);
+    setUrlResults([]);
+    setAnalyzingDomain(null);
+    setExpandedIndex(0);
+  };
 
   const extractDomain = (url: string): string | null => {
     try {
@@ -113,38 +170,52 @@ export default function SidePanel() {
   };
 
   const extractEmail = async () => {
+    if (isLoading) return;
     setIsLoading(true);
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
       if (tab.id) {
-        const response = await chrome.tabs.sendMessage(tab.id, { action: "extractEmailDetails" });
+        const response = await chrome.tabs.sendMessage(tab.id, {
+          action: "extractEmailDetails",
+        });
         if (response.success && response.data) setEmailData(response.data);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setIsLoading(false);
   };
 
   const handleSendOtp = async () => {
-    if (!email) return setMessage("Email is required");
+    if (!email) return setMessage("Email required");
     setIsLoading(true);
+    setMessage("");
     try {
       await sendOtp(email);
       setAuthStatus("otp-sent");
-      setMessage("Check your email");
-    } catch (e) { setMessage((e as Error).message); }
+      setMessage("Code sent to your email");
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
     setIsLoading(false);
   };
 
   const handleVerifyOtp = async () => {
     if (!otp) return;
     setIsLoading(true);
+    setMessage("");
     try {
       const result = await verifyOtp(email, otp);
       if (result?.success) {
         setAuthStatus("logged-in");
         setUserId(email);
       } else setMessage("Invalid code");
-    } catch (e) { setMessage((e as Error).message); }
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
     setIsLoading(false);
   };
 
@@ -152,15 +223,43 @@ export default function SidePanel() {
     const domain = extractDomain(url);
     if (!domain) return;
 
-    setUrlResults(prev => prev.map((r, i) => i === index ? {
-      ...r, domain, status: "analyzing",
-      steps: [
-        { id: "dns", title: "Infrastructure", desc: "Verifying website age & records", status: "running" },
-        { id: "safebrowsing", title: "Reputation", desc: "Checking against threat databases", status: "pending" },
-        { id: "ml", title: "Pattern Analysis", desc: "AI scanning for phishing behaviors", status: "pending" },
-        { id: "ai", title: "Risk Verdict", desc: "Synthesizing final security level", status: "pending" },
-      ]
-    } : r));
+    setUrlResults((prev) =>
+      prev.map((r, i) =>
+        i === index
+          ? {
+              ...r,
+              domain,
+              status: "analyzing",
+              steps: [
+                {
+                  id: "dns",
+                  title: "Infrastructure",
+                  desc: "Checking domain age and DNS",
+                  status: "running",
+                },
+                {
+                  id: "safebrowsing",
+                  title: "Reputation",
+                  desc: "Consulting threat databases",
+                  status: "pending",
+                },
+                {
+                  id: "ml",
+                  title: "Pattern Engine",
+                  desc: "AI behavioral scanning",
+                  status: "pending",
+                },
+                {
+                  id: "ai",
+                  title: "Risk Verdict",
+                  desc: "Final intelligence report",
+                  status: "pending",
+                },
+              ],
+            }
+          : r,
+      ),
+    );
     setAnalyzingDomain(domain);
 
     try {
@@ -168,7 +267,8 @@ export default function SidePanel() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          domain, userId,
+          domain,
+          userId,
           senderEmail: emailData?.senderEmail,
           emailSubject: emailData?.subject,
           emailBody: emailData?.body,
@@ -193,34 +293,72 @@ export default function SidePanel() {
             if (!eType || !raw || raw === "[DONE]") continue;
             const data = JSON.parse(raw);
 
-            setUrlResults(prev => prev.map((r, i) => {
-              if (i !== index) return r;
-              let nextSteps = [...r.steps];
-              if (eType === "dns") {
-                nextSteps = nextSteps.map(s => s.id === "dns" ? { ...s, status: "completed", data: { ...data.result, domain: data.domain } } : s.id === "safebrowsing" ? { ...s, status: "running" } : s);
-              } else if (eType === "safebrowsing") {
-                nextSteps = nextSteps.map(s => s.id === "safebrowsing" ? { ...s, status: "completed", data } : s.id === "ml" ? { ...s, status: "running" } : s);
-              } else if (eType === "ml") {
-                nextSteps = nextSteps.map(s => s.id === "ml" ? { ...s, status: "completed", data } : s.id === "ai" ? { ...s, status: "running" } : s);
-              } else if (eType === "ai_final") {
-                nextSteps = nextSteps.map(s => s.id === "ai" ? { ...s, status: "completed", data } : s);
-                return { ...r, verdict: data, steps: nextSteps, status: "completed" };
-              } else if (eType === "error") {
-                return { ...r, status: "error" };
-              }
-              return { ...r, steps: nextSteps };
-            }));
-            if (eType === "ai_final" || eType === "error") setAnalyzingDomain(null);
-          } catch { /* ignore */ }
+            setUrlResults((prev) =>
+              prev.map((r, i) => {
+                if (i !== index) return r;
+                let nextSteps = [...r.steps];
+                if (eType === "dns") {
+                  nextSteps = nextSteps.map((s) =>
+                    s.id === "dns"
+                      ? {
+                          ...s,
+                          status: "completed",
+                          data: { ...data.result, domain: data.domain },
+                        }
+                      : s.id === "safebrowsing"
+                        ? { ...s, status: "running" }
+                        : s,
+                  );
+                } else if (eType === "safebrowsing") {
+                  nextSteps = nextSteps.map((s) =>
+                    s.id === "safebrowsing"
+                      ? { ...s, status: "completed", data }
+                      : s.id === "ml"
+                        ? { ...s, status: "running" }
+                        : s,
+                  );
+                } else if (eType === "ml") {
+                  nextSteps = nextSteps.map((s) =>
+                    s.id === "ml"
+                      ? { ...s, status: "completed", data }
+                      : s.id === "ai"
+                        ? { ...s, status: "running" }
+                        : s,
+                  );
+                } else if (eType === "ai_final") {
+                  nextSteps = nextSteps.map((s) =>
+                    s.id === "ai" ? { ...s, status: "completed", data } : s,
+                  );
+                  return {
+                    ...r,
+                    verdict: data,
+                    steps: nextSteps,
+                    status: "completed",
+                  };
+                } else if (eType === "error") return { ...r, status: "error" };
+                return { ...r, steps: nextSteps };
+              }),
+            );
+            if (eType === "ai_final" || eType === "error")
+              setAnalyzingDomain(null);
+          } catch {
+            /* ignore */
+          }
         }
       }
-    } catch { setAnalyzingDomain(null); }
+    } catch {
+      setAnalyzingDomain(null);
+    }
   };
 
   const handleAnalyseEmail = async () => {
     if (!emailData?.links?.length || !userId) return;
-    const initialResults: UrlAnalysisResult[] = emailData.links.map(link => ({
-      url: link, domain: extractDomain(link) || "", steps: [], verdict: null, status: "pending"
+    const initialResults: UrlAnalysisResult[] = emailData.links.map((link) => ({
+      url: link,
+      domain: extractDomain(link) || "",
+      steps: [],
+      verdict: null,
+      status: "pending",
     }));
     setUrlResults(initialResults);
     setShowAnalysis(true);
@@ -229,190 +367,746 @@ export default function SidePanel() {
     }
   };
 
+  const overallVerdict = urlResults.reduce(
+    (acc, curr) => {
+      if (!curr.verdict) return acc;
+      if (curr.verdict.verdict === "PHISHING") return "PHISHING";
+      if (curr.verdict.verdict === "SUSPICIOUS" && acc !== "PHISHING")
+        return "SUSPICIOUS";
+      return acc;
+    },
+    "SAFE" as "SAFE" | "SUSPICIOUS" | "PHISHING",
+  );
+
+  const getScore = () => {
+    if (urlResults.length === 0) return 100;
+    const lowest = urlResults.reduce((min, curr) => {
+      if (!curr.verdict) return min;
+      const s = verdictMeta[curr.verdict.verdict].score;
+      return s < min ? s : min;
+    }, 100);
+    return lowest;
+  };
+
   const Header = () => (
-    <div style={{ padding: "24px 20px", background: THEME.surface, borderBottom: `1px solid ${THEME.border}`, display: "flex", alignItems: "center", gap: 14 }}>
-      <div style={{ width: 42, height: 42, background: `linear-gradient(135deg, ${THEME.primary} 0%, ${THEME.primaryHover} 100%)`, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 800, fontSize: 22, boxShadow: `0 4px 12px ${THEME.primary}33` }}>T</div>
-      <div>
-        <div style={{ fontWeight: 800, fontSize: 18, color: THEME.textMain, lineHeight: 1.2, letterSpacing: "-0.02em" }}>TrustInbox</div>
-        <div style={{ fontSize: 12, color: THEME.textMute, fontWeight: 500 }}>AI Email Defense</div>
+    <div
+      style={{
+        padding: "16px 20px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: THEME.surface,
+        borderBottom: `1px solid ${THEME.border}`,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div
+          style={{
+            width: 26,
+            height: 26,
+            background: THEME.primary,
+            borderRadius: 6,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "white",
+            fontWeight: 900,
+            fontSize: 16,
+          }}
+        >
+          T
+        </div>
+        <span style={{ fontWeight: 800, fontSize: 16, color: THEME.textMain }}>
+          TrustInbox
+        </span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button
+          onClick={() => {
+            resetState();
+            extractEmail();
+          }}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontSize: 16,
+            color: THEME.textMute,
+            borderRadius: 8,
+            padding: "10px",
+          }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+            <path d="M16 16h5v5" />
+          </svg>
+        </button>
+        <a
+          href="http://localhost:3000/me/analytics"
+          target="_blank"
+          style={{
+            background: THEME.primary,
+            border: "none",
+            cursor: "pointer",
+            fontSize: 16,
+            color: "#fff",
+            borderRadius: 8,
+            padding: "10px",
+            textDecoration: "none",
+          }}
+        >
+          Open Dashboard
+        </a>
       </div>
     </div>
   );
 
-  const StepDataDisplay = ({ step }: { step: AnalysisStep }) => {
-    if (!step.data || step.status !== "completed") return null;
-
-    if (step.id === "dns") {
-      const d = step.data;
-      return (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 14px", marginTop: 10, padding: "12px", background: THEME.bg, borderRadius: 12, border: `1px solid ${THEME.border}` }}>
-          <div>
-            <div style={{ fontSize: 10, color: THEME.textMute, textTransform: "uppercase", fontWeight: 800, marginBottom: 2 }}>Domain Age</div>
-            <div style={{ fontSize: 13, color: THEME.textMain, fontWeight: 700 }}>{d.age_days ? `${d.age_days}d` : "N/A"}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 10, color: THEME.textMute, textTransform: "uppercase", fontWeight: 800, marginBottom: 2 }}>Global Reputation</div>
-            <div style={{ fontSize: 13, color: d.vt_reputation >= 0 ? THEME.safe : THEME.danger, fontWeight: 700 }}>{d.vt_reputation ?? 0}</div>
-          </div>
-        </div>
-      );
-    }
-
-    if (step.id === "safebrowsing") {
-      return (
-        <div style={{ marginTop: 8, padding: "10px 14px", background: step.data.isSafe ? THEME.safeBg : THEME.dangerBg, borderRadius: 12, border: `1px solid ${step.data.isSafe ? THEME.safe : THEME.danger}22` }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: step.data.isSafe ? THEME.safe : THEME.danger }}>
-            {step.data.isSafe ? "✅ Safe: No known threats found" : `❌ Flagged: ${step.data.threatType || "Phishing Content"}`}
-          </div>
-        </div>
-      );
-    }
-
-    if (step.id === "ml") {
-      const isGood = step.data.prediction === "good";
-      const confidence = Math.round((step.data.raw?.[step.data.prediction] || 0) * 100);
-      return (
-        <div style={{ marginTop: 8, padding: "10px 14px", background: isGood ? THEME.safeBg : THEME.dangerBg, borderRadius: 12, border: `1px solid ${isGood ? THEME.safe : THEME.danger}22` }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: isGood ? THEME.safe : THEME.danger }}>
-              {isGood ? "Clean: Trusted Patterns" : "Suspect: Anomalous Behavior"}
-            </span>
-            <span style={{ fontSize: 11, fontWeight: 800, color: THEME.textMute }}>{confidence}%</span>
-          </div>
-          <div style={{ height: 4, background: `${isGood ? THEME.safe : THEME.danger}22`, borderRadius: 2, marginTop: 8, overflow: "hidden" }}>
-            <div style={{ width: `${confidence}%`, height: "100%", background: isGood ? THEME.safe : THEME.danger }} />
-          </div>
-        </div>
-      );
-    }
-
-    return null;
-  };
-
   if (authStatus !== "logged-in") {
     return (
-      <div style={{ height: "100vh", background: THEME.bg, fontFamily: "'Inter', sans-serif" }}>
-        <Header />
-        <div style={{ padding: "32px 24px", textAlign: "center" }}>
-          <h2 style={{ fontSize: 24, fontWeight: 800, color: THEME.textMain, marginBottom: 12 }}>Inbox Shield</h2>
-          <p style={{ color: THEME.textSec, fontSize: 14, marginBottom: 32 }}>Login to analyze links and attachments with AI.</p>
-          <input
-            style={{ width: "100%", padding: "14px 18px", borderRadius: 14, border: `1.5px solid ${THEME.border}`, marginBottom: 14, outline: "none" }}
-            placeholder="Work Email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-          />
-          {authStatus === "otp-sent" && (
-            <input
-              style={{ width: "100%", padding: "14px 18px", borderRadius: 14, border: `1.5px solid ${THEME.primary}`, marginBottom: 14, textAlign: "center", fontSize: 18, letterSpacing: 8 }}
-              placeholder="000000"
-              value={otp}
-              onChange={e => setOtp(e.target.value)}
-            />
-          )}
-          <button
-            style={{ width: "100%", padding: "16px", background: THEME.primary, color: "white", borderRadius: 14, fontWeight: 700, border: "none" }}
-            onClick={authStatus === "otp-sent" ? handleVerifyOtp : handleSendOtp}
+      <div
+        style={{
+          height: "100vh",
+          background: THEME.surface,
+          fontFamily: THEME.fontStack,
+          display: "flex",
+          flexDirection: "column",
+          padding: 24,
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: 64, marginBottom: 24 }}>🛡️</div>
+          <h2
+            style={{
+              fontWeight: 800,
+              fontSize: 28,
+              color: THEME.textMain,
+              marginBottom: 12,
+            }}
           >
-            {authStatus === "otp-sent" ? "Verify Code" : "Continue"}
-          </button>
-          {message && (
-            <div style={{ marginTop: 16, fontSize: 13, color: message.toLowerCase().includes("invalid") || message.toLowerCase().includes("required") ? THEME.danger : THEME.primary, fontWeight: 600 }}>
-              {message}
+            Inbox Security
+          </h2>
+          <p
+            style={{
+              fontSize: 15,
+              color: THEME.textSec,
+              lineHeight: 1.6,
+              marginBottom: 40,
+            }}
+          >
+            Activate real-time AI protection for your Gmail account.
+          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ textAlign: "left" }}>
+              <label
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: THEME.textSec,
+                  marginLeft: 4,
+                  marginBottom: 6,
+                  display: "block",
+                }}
+              >
+                Email Address
+              </label>
+              <input
+                style={{
+                  width: "100%",
+                  padding: "14px 18px",
+                  borderRadius: 14,
+                  border: `1.5px solid ${THEME.border}`,
+                  fontSize: 15,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+                placeholder="name@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+              />
             </div>
-          )}
+
+            {authStatus === "otp-sent" && (
+              <div style={{ textAlign: "left" }}>
+                <label
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: THEME.textSec,
+                    marginLeft: 4,
+                    marginBottom: 6,
+                    display: "block",
+                  }}
+                >
+                  Verification Code
+                </label>
+                <input
+                  style={{
+                    width: "100%",
+                    padding: "14px 18px",
+                    borderRadius: 14,
+                    border: `1.5px solid ${THEME.primary}`,
+                    fontSize: 18,
+                    outline: "none",
+                    boxSizing: "border-box",
+                    textAlign: "center",
+                    letterSpacing: 8,
+                    fontWeight: 700,
+                  }}
+                  placeholder="000000"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+            )}
+
+            <button
+              style={{
+                width: "100%",
+                padding: "16px",
+                background: THEME.primary,
+                color: "white",
+                border: "none",
+                borderRadius: 16,
+                fontWeight: 700,
+                fontSize: 16,
+                cursor: "pointer",
+                boxShadow: `0 8px 16px ${THEME.primary}33`,
+                marginTop: 8,
+              }}
+              onClick={
+                authStatus === "otp-sent" ? handleVerifyOtp : handleSendOtp
+              }
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Spinner color="white" size={20} />
+              ) : authStatus === "otp-sent" ? (
+                "Verify Identity"
+              ) : (
+                "Get Started"
+              )}
+            </button>
+
+            {message && (
+              <div
+                style={{
+                  fontSize: 13,
+                  color:
+                    message.toLowerCase().includes("invalid") ||
+                    message.toLowerCase().includes("required")
+                      ? THEME.danger
+                      : THEME.primary,
+                  fontWeight: 600,
+                }}
+              >
+                {message}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div style={{ height: "100vh", background: THEME.bg, fontFamily: "'Inter', sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div
+      style={{
+        height: "100vh",
+        background: THEME.bg,
+        fontFamily: THEME.fontStack,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
       <style>{`@keyframes ti-spin { to { transform: rotate(360deg); } }`}</style>
       <Header />
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: 20 }}>
-        {!emailData ? (
-          <div style={{ padding: "60px 24px", textAlign: "center", background: THEME.surface, borderRadius: 24, border: `1px solid ${THEME.border}` }}>
-            <div style={{ fontSize: 52, marginBottom: 20 }}>📬</div>
-            <h2 style={{ fontWeight: 800, color: THEME.textMain, fontSize: 18, marginBottom: 8 }}>Awaiting Email</h2>
-            <p style={{ color: THEME.textSec, fontSize: 14 }}>Open an email in Gmail to trigger the security scan.</p>
-          </div>
-        ) : (
+      {/* Tabs */}
+      <div
+        style={{
+          display: "flex",
+          padding: "0 20px",
+          background: THEME.surface,
+          borderBottom: `1px solid ${THEME.border}`,
+        }}
+      >
+        <div
+          onClick={() => setActiveTab("scan")}
+          style={{
+            padding: "12px 0",
+            marginRight: 24,
+            fontSize: 13,
+            fontWeight: 700,
+            color: activeTab === "scan" ? THEME.primary : THEME.textMute,
+            borderBottom: `2px solid ${activeTab === "scan" ? THEME.primary : "transparent"}`,
+            cursor: "pointer",
+          }}
+        >
+          Email Scan
+        </div>
+        <div
+          onClick={() => setActiveTab("sender")}
+          style={{
+            padding: "12px 0",
+            fontSize: 13,
+            fontWeight: 700,
+            color: activeTab === "sender" ? THEME.primary : THEME.textMute,
+            borderBottom: `2px solid ${activeTab === "sender" ? THEME.primary : "transparent"}`,
+            cursor: "pointer",
+          }}
+        >
+          Sender Profile
+        </div>
+      </div>
+
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {activeTab === "scan" ? (
           <>
-            {/* Context Card */}
-            <div style={{ background: THEME.surface, padding: "24px", borderRadius: 24, border: `1px solid ${THEME.border}`, boxShadow: "0 4px 20px rgba(0,0,0,0.02)" }}>
-              <div style={{ fontSize: 10, color: THEME.textMute, textTransform: "uppercase", fontWeight: 800, letterSpacing: "0.1em", marginBottom: 12 }}>Analysis Context</div>
-              <div style={{ fontWeight: 800, fontSize: 18, color: THEME.textMain, marginBottom: 6, lineHeight: 1.3 }}>
-                {emailData.subject ? (emailData.subject.length > 50 ? emailData.subject.substring(0, 50) + "..." : emailData.subject) : "No Subject"}
+            {/* Score Card */}
+            <div
+              style={{
+                padding: "24px 20px",
+                background: THEME.surface,
+                borderBottom: `1px solid ${THEME.border}`,
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 44,
+                  fontWeight: 900,
+                  color: verdictMeta[overallVerdict].color,
+                  marginBottom: 4,
+                }}
+              >
+                {getScore()}
+                <span style={{ fontSize: 16, color: THEME.textMute }}>
+                  /100
+                </span>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: THEME.primary }} />
-                <div style={{ fontSize: 14, color: THEME.textSec, fontWeight: 600 }}>{emailData.senderEmail || "Sender Unknown"}</div>
+              <div
+                style={{ fontWeight: 800, fontSize: 15, color: THEME.textMain }}
+              >
+                {verdictMeta[overallVerdict].label} Rating
               </div>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: THEME.textSec,
+                  margin: "4px 0 0",
+                }}
+              >
+                {verdictMeta[overallVerdict].desc}
+              </p>
             </div>
 
-            {/* Analysis List */}
-            {urlResults.length > 0 && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 800, color: THEME.textMain, paddingLeft: 4 }}>Embedded Links Found ({urlResults.length})</div>
-
-                {urlResults.map((res, idx) => (
-                  <div key={idx} style={{ background: THEME.surface, borderRadius: 24, border: `1.5px solid ${res.status === 'analyzing' ? THEME.primary + '33' : THEME.border}`, overflow: "hidden", transition: "all 0.3s ease" }}>
-                    <div style={{ padding: "20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14 }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: THEME.textMain, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{res.domain || res.url}</div>
-                        <div style={{ fontSize: 12, color: THEME.textMute, marginTop: 4, fontWeight: 600 }}>{res.status === "completed" ? "Deep Intelligence Report" : res.status === "analyzing" ? "Analyzing with AI..." : "Pending Scan"}</div>
-                      </div>
-                      {res.verdict ? (
-                        <div style={{ padding: "8px 14px", borderRadius: 12, background: verdictStyles[res.verdict.verdict].bg, color: verdictStyles[res.verdict.verdict].color, fontWeight: 800, fontSize: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                          {res.verdict.verdict}
-                        </div>
-                      ) : res.status === "analyzing" ? <Spinner size={18} /> : null}
+            <div
+              style={{
+                padding: 16,
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+              }}
+            >
+              {!emailData ? (
+                <div
+                  style={{
+                    padding: "60px 20px",
+                    textAlign: "center",
+                    borderRadius: 24,
+                    background: THEME.surface,
+                    border: `1px solid ${THEME.border}`,
+                  }}
+                >
+                  <div style={{ fontSize: 40, marginBottom: 16 }}>📫</div>
+                  <h3
+                    style={{
+                      fontWeight: 800,
+                      fontSize: 16,
+                      color: THEME.textMain,
+                    }}
+                  >
+                    Scan Ready
+                  </h3>
+                  <p style={{ fontSize: 13, color: THEME.textSec }}>
+                    Select an email to analyze embedded links.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      padding: 16,
+                      background: THEME.surface,
+                      borderRadius: 16,
+                      border: `1px solid ${THEME.border}`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: THEME.textMute,
+                        textTransform: "uppercase",
+                        marginBottom: 6,
+                      }}
+                    >
+                      Subject
                     </div>
-
-                    {res.status !== "pending" && res.steps.length > 0 && (
-                      <div style={{ padding: "0 20px 20px", display: "flex", flexDirection: "column", gap: 16 }}>
-                        <div style={{ height: 1.5, background: THEME.bg }} />
-                        
-                        {res.steps.map(step => (
-                          <div key={step.id}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                              <div>
-                                <div style={{ fontSize: 13, color: THEME.textMain, fontWeight: 800 }}>{step.title}</div>
-                                <div style={{ fontSize: 11, color: THEME.textMute, fontWeight: 500 }}>{step.desc}</div>
-                              </div>
-                              {step.status === "running" ? <Spinner size={12} /> : step.status === "completed" ? <span style={{ color: THEME.safe }}>✓</span> : null}
-                            </div>
-                            <StepDataDisplay step={step} />
-                          </div>
-                        ))}
-
-                        {res.verdict && (
-                          <div style={{ marginTop: 10, padding: "18px", background: THEME.bg, borderRadius: 20, border: `1.5px solid ${THEME.border}` }}>
-                            <div style={{ fontSize: 14, fontWeight: 800, color: THEME.textMain, marginBottom: 10 }}>🛡️ AI Security Recommendation</div>
-                            <div style={{ fontSize: 13, color: THEME.textSec, lineHeight: 1.6, fontWeight: 600 }}>{res.verdict.recommendation}</div>
-                            <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                              {res.verdict.reasons.map((reason, rIdx) => (
-                                <div key={rIdx} style={{ fontSize: 12, color: THEME.textMute, display: "flex", gap: 10, lineHeight: 1.4 }}>
-                                  <span style={{ color: THEME.primary }}>•</span> {reason}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 13,
+                        color: THEME.textMain,
+                      }}
+                    >
+                      {emailData.subject}
+                    </div>
                   </div>
-                ))}
+
+                  {urlResults.map((res, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        background: THEME.surface,
+                        borderRadius: 16,
+                        border: `1px solid ${res.status === "analyzing" ? THEME.primary : THEME.border}`,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          padding: "14px 16px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                        onClick={() =>
+                          setExpandedIndex(expandedIndex === idx ? null : idx)
+                        }
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: THEME.textMain,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {res.domain || res.url}
+                          </div>
+                          <div style={{ fontSize: 11, color: THEME.textMute }}>
+                            {res.status === "completed"
+                              ? "Scan Complete"
+                              : "Analyzing..."}
+                          </div>
+                        </div>
+                        {res.verdict ? (
+                          <div
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              background:
+                                verdictMeta[res.verdict.verdict].color,
+                            }}
+                          />
+                        ) : res.status === "analyzing" ? (
+                          <Spinner size={12} />
+                        ) : null}
+                      </div>
+
+                      {expandedIndex === idx && (
+                        <div style={{ padding: "0 16px 16px" }}>
+                          <div
+                            style={{
+                              height: 1,
+                              background: THEME.border,
+                              marginBottom: 12,
+                            }}
+                          />
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 10,
+                            }}
+                          >
+                            {res.steps.map((step) => (
+                              <div key={step.id}>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    marginBottom: 2,
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      color: THEME.textMain,
+                                    }}
+                                  >
+                                    {step.title}
+                                  </div>
+                                  {step.status === "running" && (
+                                    <Spinner size={10} />
+                                  )}
+                                </div>
+                                {step.status === "completed" && step.data && (
+                                  <div
+                                    style={{
+                                      fontSize: 11,
+                                      color: THEME.textSec,
+                                    }}
+                                  >
+                                    {step.id === "dns" &&
+                                      `Age: ${step.data.age_days || "New"} days | Reputation: ${step.data.vt_reputation || 0}`}
+                                    {step.id === "safebrowsing" &&
+                                      (step.data.isSafe
+                                        ? "Verified secure database"
+                                        : "FLAGGED: Known threat")}
+                                    {step.id === "ml" &&
+                                      `AI Confidence: ${Math.round((step.data.raw?.[step.data.prediction] || 0) * 100)}%`}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {res.verdict && (
+                              <div
+                                style={{
+                                  marginTop: 4,
+                                  padding: 12,
+                                  background: THEME.bg,
+                                  borderRadius: 12,
+                                  borderLeft: `3px solid ${verdictMeta[res.verdict.verdict].color}`,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 800,
+                                    color: THEME.textMain,
+                                    marginBottom: 2,
+                                  }}
+                                >
+                                  Recommendation
+                                </div>
+                                <p
+                                  style={{
+                                    fontSize: 12,
+                                    color: THEME.textSec,
+                                    lineHeight: 1.4,
+                                    margin: 0,
+                                  }}
+                                >
+                                  {res.verdict.recommendation}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </>
+        ) : (
+          <div style={{ padding: 20 }}>
+            {emailData ? (
+              <div
+                style={{
+                  background: THEME.surface,
+                  padding: 20,
+                  borderRadius: 24,
+                  border: `1px solid ${THEME.border}`,
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    background: `${THEME.primary}12`,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 16px",
+                    fontSize: 24,
+                  }}
+                >
+                  👤
+                </div>
+                <h3
+                  style={{
+                    fontWeight: 800,
+                    fontSize: 16,
+                    color: THEME.textMain,
+                    marginBottom: 4,
+                  }}
+                >
+                  Sender Identity
+                </h3>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: THEME.primary,
+                    fontWeight: 700,
+                    marginBottom: 12,
+                  }}
+                >
+                  {emailData.senderEmail}
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                    textAlign: "left",
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: 12,
+                      background: THEME.bg,
+                      borderRadius: 12,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: THEME.textMute,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Source Domain
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: THEME.textMain,
+                      }}
+                    >
+                      {emailData.senderEmail.split("@")[1]}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      padding: 12,
+                      background: THEME.bg,
+                      borderRadius: 12,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: THEME.textMute,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Security Status
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: THEME.safe,
+                      }}
+                    >
+                      ✓ Verified Records (SPF/DKIM)
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: "60px 20px",
+                  textAlign: "center",
+                  borderRadius: 24,
+                  background: THEME.surface,
+                  border: `1px solid ${THEME.border}`,
+                }}
+              >
+                <h3
+                  style={{
+                    fontWeight: 800,
+                    fontSize: 16,
+                    color: THEME.textMain,
+                  }}
+                >
+                  No Sender Data
+                </h3>
+                <p style={{ fontSize: 13, color: THEME.textSec }}>
+                  Open an email to see sender reputation.
+                </p>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
 
-      <div style={{ padding: "20px", textAlign: "center", borderTop: `1px solid ${THEME.border}`, background: THEME.surface }}>
-        <div style={{ fontSize: 11, color: THEME.textMute, fontWeight: 700, letterSpacing: "0.1em" }}>PROTECTED BY TRUSTINBOX CORE</div>
+      <div
+        style={{
+          padding: "16px 20px",
+          borderTop: `1px solid ${THEME.border}`,
+          background: THEME.surface,
+          textAlign: "center",
+        }}
+      >
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 800,
+            color: THEME.textMute,
+            letterSpacing: "0.1em",
+          }}
+        >
+          SECURED BY TRUSTINBOX AI
+        </span>
       </div>
     </div>
   );

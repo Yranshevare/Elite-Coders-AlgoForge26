@@ -1,16 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { DashboardSidebar } from "@/components/DashboardSidebar";
-import { HistoryView } from "@/components/HistoryView";
-import { SimulationView } from "@/components/SimulationView";
 import { useSession } from "@/lib/auth/context";
+import { DashboardHeader } from "@/components/DashboardHeader";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-export default function DashboardPage() {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { user, loading } = useSession();
-  const [activeTab, setActiveTab] = useState<"simulation" | "history">(
-    "simulation",
-  );
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user) {
+      const path = window.location.pathname;
+      if (path === "/me") {
+        router.replace("/me/analytics");
+      }
+    }
+  }, [user, loading, router]);
 
   if (loading) {
     return (
@@ -52,15 +62,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-background via-background to-muted/20">
-      <DashboardSidebar
-        user={user}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-      />
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-muted/20">
+      <DashboardHeader user={user} />
 
       <main className="flex-1 overflow-auto">
-        {activeTab === "simulation" ? <SimulationView /> : <HistoryView />}
+        {children}
       </main>
     </div>
   );

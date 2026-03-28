@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -10,15 +12,12 @@ interface User {
 
 interface DashboardSidebarProps {
   user: User;
-  activeTab: "simulation" | "history";
-  onTabChange: (tab: "simulation" | "history") => void;
 }
 
-export function DashboardSidebar({
-  user,
-  activeTab,
-  onTabChange,
-}: DashboardSidebarProps) {
+export function DashboardSidebar({ user }: DashboardSidebarProps) {
+  const pathname = usePathname();
+  
+  const isActive = (path: string) => pathname === path;
   return (
     <aside className="w-64 border-r bg-gradient-to-b from-card to-background flex flex-col">
       <div className="p-5 border-b">
@@ -62,12 +61,11 @@ export function DashboardSidebar({
       </div>
 
       <nav className="flex-1 p-3 space-y-1">
-        <button
-          type="button"
-          onClick={() => onTabChange("simulation")}
+        <Link
+          href="/me/analytics"
           className={cn(
             "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-            activeTab === "simulation"
+            isActive("/me/analytics")
               ? "bg-primary/10 text-primary shadow-sm"
               : "text-muted-foreground hover:bg-muted hover:text-foreground",
           )}
@@ -75,7 +73,44 @@ export function DashboardSidebar({
           <div
             className={cn(
               "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-              activeTab === "simulation"
+              isActive("/me/analytics")
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted",
+            )}
+          >
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+              />
+            </svg>
+          </div>
+          Analytics
+          {isActive("/me/analytics") && (
+            <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
+          )}
+        </Link>
+        <Link
+          href="/me/simulation"
+          className={cn(
+            "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+            isActive("/me/simulation")
+              ? "bg-primary/10 text-primary shadow-sm"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          )}
+        >
+          <div
+            className={cn(
+              "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
+              isActive("/me/simulation")
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted",
             )}
@@ -96,16 +131,15 @@ export function DashboardSidebar({
             </svg>
           </div>
           Simulation
-          {activeTab === "simulation" && (
+          {isActive("/me/simulation") && (
             <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
           )}
-        </button>
-        <button
-          type="button"
-          onClick={() => onTabChange("history")}
+        </Link>
+        <Link
+          href="/me/history"
           className={cn(
             "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-            activeTab === "history"
+            isActive("/me/history")
               ? "bg-primary/10 text-primary shadow-sm"
               : "text-muted-foreground hover:bg-muted hover:text-foreground",
           )}
@@ -113,7 +147,7 @@ export function DashboardSidebar({
           <div
             className={cn(
               "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-              activeTab === "history"
+              isActive("/me/history")
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted",
             )}
@@ -134,10 +168,10 @@ export function DashboardSidebar({
             </svg>
           </div>
           History
-          {activeTab === "history" && (
+          {isActive("/me/history") && (
             <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
           )}
-        </button>
+        </Link>
       </nav>
 
       <div className="p-4 border-t">

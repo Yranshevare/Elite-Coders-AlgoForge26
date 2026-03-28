@@ -19,6 +19,7 @@ interface SessionContextType {
   user: User | null;
   loading: boolean;
   refresh: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -39,12 +40,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const logout = useCallback(async () => {
+    try {
+      await fetch("/api/auth", {
+        method: "DELETE",
+      });
+      setUser(null);
+    } catch {
+      setUser(null);
+    }
+  }, []);
+
   useEffect(() => {
     refresh();
   }, [refresh]);
 
   return (
-    <SessionContext.Provider value={{ user, loading, refresh }}>
+    <SessionContext.Provider value={{ user, loading, refresh, logout }}>
       {children}
     </SessionContext.Provider>
   );
