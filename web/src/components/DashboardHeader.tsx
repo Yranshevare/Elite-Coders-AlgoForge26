@@ -4,20 +4,18 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSession } from "@/lib/auth/context";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface User {
   id: string;
   email: string;
 }
 
-interface DashboardHeaderProps {
-  user: User;
-}
-
-export function DashboardHeader({ user }: DashboardHeaderProps) {
+export function DashboardHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const { logout } = useSession();
+  const { logout, user } = useSession();
 
   const isActive = (path: string) => pathname === path;
 
@@ -44,6 +42,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2"
+                aria-hidden="true"
               >
                 <path
                   strokeLinecap="round"
@@ -61,7 +60,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
+                  "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
                   isActive(item.href)
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted",
@@ -75,21 +74,18 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-sm">
-            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
-              <span className="text-xs font-semibold text-white">
-                {user.email.charAt(0).toUpperCase()}
-              </span>
-            </div>
+            <Avatar className="h-7 w-7">
+              <AvatarFallback className="text-xs bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
+                {user?.email.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
             <span className="text-muted-foreground hidden sm:inline">
-              {user.email}
+              {user?.email}
             </span>
           </div>
-          <button
-            onClick={handleLogout}
-            className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors"
-          >
+          <Button variant="ghost" size="sm" onClick={handleLogout}>
             Logout
-          </button>
+          </Button>
         </div>
       </div>
     </header>

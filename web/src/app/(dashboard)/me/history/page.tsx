@@ -1,8 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSession } from "@/lib/auth/context";
-import { useRouter } from "next/navigation";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 interface HistoryItem {
   id: string;
@@ -20,81 +29,93 @@ interface HistoryItem {
   attachmentCount: number;
 }
 
+interface ParsedVerdict {
+  verdict: string;
+  confidence: number;
+  recommendation: string;
+  reasons: string[];
+}
+
+function safeParse<T>(value: string | null): T | null {
+  try {
+    return value ? JSON.parse(value) : null;
+  } catch {
+    return null;
+  }
+}
+
 function HistorySidebar({
   item,
+  open,
   onClose,
 }: {
-  item: HistoryItem;
+  item: HistoryItem | null;
+  open: boolean;
   onClose: () => void;
 }) {
-  const verdict = item.finalAiVerdict ? JSON.parse(item.finalAiVerdict) : null;
-  const links = item.links ? JSON.parse(item.links) : [];
-  const dns = item.dnsLookupResult ? JSON.parse(item.dnsLookupResult) : null;
-  const safeBrowsing = item.googleSafeBrowsingResult
-    ? JSON.parse(item.googleSafeBrowsingResult)
-    : null;
-  const ml = item.mlResponse ? JSON.parse(item.mlResponse) : null;
+  const parsedData = useMemo(() => {
+    if (!item)
+      return {
+        verdict: null,
+        links: [],
+        dns: null,
+        safeBrowsing: null,
+        ml: null,
+      };
 
-  const getVerdictColor = (v: string) => {
-    if (v === "SAFE") return "bg-green-500";
-    if (v === "SUSPICIOUS") return "bg-yellow-500";
-    return "bg-red-500";
+    return {
+      verdict: safeParse<ParsedVerdict>(item.finalAiVerdict),
+      links: safeParse<string[]>(item.links) || [],
+      dns: safeParse<any>(item.dnsLookupResult),
+      safeBrowsing: safeParse<any>(item.googleSafeBrowsingResult),
+      ml: safeParse<any>(item.mlResponse),
+    };
+  }, [item]);
+
+  if (!item) return null;
+
+  const { verdict, links, dns, safeBrowsing, ml } = parsedData;
+
+  const getVerdictVariant = (
+    v: string,
+  ): "default" | "destructive" | "secondary" => {
+    if (v === "SAFE") return "default";
+    if (v === "SUSPICIOUS") return "secondary";
+    return "destructive";
   };
 
   return (
-    <>
-      <div
-        className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="fixed right-0 top-0 z-50 h-full w-full max-w-md bg-background shadow-xl overflow-y-auto border-l">
-        <div className="sticky top-0 bg-background/95 backdrop-blot border-b p-4 flex items-center justify-between">
-          <h3 className="font-semibold text-lg">Analysis Details</h3>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-muted rounded-lg transition-colors"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetTrigger>
+        <button className="text-sm text-muted-foreground hover:text-foreground">
+          View Details
+        </button>
+      </SheetTrigger>
+      <SheetContent>
+        <SheetHeader className="mb-4">
+          <SheetTitle>Analysis Details</SheetTitle>
+        </SheetHeader>
 
-        <div className="p-4 space-y-4">
+        <div className="space-y-4 px-6 overflow-y-auto">
           {verdict && (
-            <div
-              className={`p-4 rounded-lg border ${getVerdictColor(verdict.verdict)}/10`}
-            >
+            <div>
               <div className="flex items-center gap-2 mb-2">
-                <span
-                  className={`px-2 py-1 rounded text-xs font-bold text-white ${getVerdictColor(verdict.verdict)}`}
-                >
+                <Badge variant={getVerdictVariant(verdict.verdict)}>
                   {verdict.verdict}
-                </span>
+                </Badge>
                 <span className="text-sm text-muted-foreground">
-                  {Math.round(verdict.confidence * 100)}% confidence
+                  {Math.round((verdict.confidence || 0) * 100)}% confidence
                 </span>
               </div>
               <p className="text-sm">{verdict.recommendation}</p>
-              {verdict.reasons.length > 0 && (
+              {verdict.reasons?.length > 0 && (
                 <ul className="mt-2 space-y-1">
-                  {verdict.reasons.map((r: string, i: number) => (
+                  {verdict.reasons.map((r, idx) => (
                     <li
-                      key={i}
+                      key={idx}
                       className="text-xs text-muted-foreground flex items-start gap-2"
                     >
-                      <span className="text-muted-foreground mt-0.5">•</span>{" "}
-                      {r}
+                      <span className="mt-0.5">•</span> {r}
                     </li>
                   ))}
                 </ul>
@@ -125,9 +146,9 @@ function HistorySidebar({
             <div className="space-y-2">
               <h4 className="font-medium text-sm">Links ({links.length})</h4>
               <div className="space-y-1">
-                {links.map((link: string, i: number) => (
+                {links.map((link, idx) => (
                   <a
-                    key={i}
+                    key={idx}
                     href={link}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -157,15 +178,15 @@ function HistorySidebar({
                   {dns.dnssec_valid ? "Valid" : "Unsigned"}
                 </p>
                 <p>
-                  <span className="text-muted-foreground">Flux Score:</span>{" "}
+                  <span className="text-muted-foreground">Flux:</span>{" "}
                   {dns.flux_score}
                 </p>
                 <p>
-                  <span className="text-muted-foreground">VT Malicious:</span>{" "}
+                  <span className="text-muted-foreground">VT Mal:</span>{" "}
                   {dns.vt_malicious}
                 </p>
                 <p>
-                  <span className="text-muted-foreground">Reputation:</span>{" "}
+                  <span className="text-muted-foreground">Rep:</span>{" "}
                   {dns.vt_reputation}
                 </p>
               </div>
@@ -192,7 +213,7 @@ function HistorySidebar({
                 {ml.prediction === "good"
                   ? "Looks legitimate"
                   : "Likely malicious"}{" "}
-                ({Math.round(ml.raw?.good * 100)}% good)
+                ({Math.round((ml.raw?.good ?? 0) * 100)}% good)
               </p>
             </div>
           )}
@@ -204,25 +225,49 @@ function HistorySidebar({
               : "Unknown"}
           </p>
         </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="space-y-6 p-8">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-48" />
+        <Skeleton className="h-4 w-72" />
       </div>
-    </>
+      <div className="grid gap-3">
+        {[...Array(5)].map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-lg" />
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-4 w-48" />
+                  <Skeleton className="h-3 w-32" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
   );
 }
 
 export default function HistoryPage() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [mounted, setMounted] = useState(false);
   const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
   const { user } = useSession();
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
     async function fetchHistory() {
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
       try {
         const res = await fetch(`/api/history?userId=${user.id}`);
@@ -240,174 +285,42 @@ export default function HistoryPage() {
     fetchHistory();
   }, [user]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          <p className="text-sm text-muted-foreground">Loading history...</p>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <LoadingState />;
 
   if (history.length === 0) {
-    return (
-      <div className="space-y-6 p-8">
-        <div className="space-y-1 flex gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <svg
-                className="w-4 h-4 text-primary"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-          </div>
-          <div className="flex items-start flex-col">
-            <h2 className="text-xl font-semibold">Analysis History</h2>
-            <p className="text-sm text-muted-foreground ">
-              Your analyzed emails and domains
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center justify-center py-20 px-4">
-          <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mb-4">
-            <svg
-              className="w-10 h-10 text-muted-foreground/50"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
-          <p className="text-lg font-medium text-muted-foreground mb-2">
-            No history yet
-          </p>
-          <p className="text-sm text-muted-foreground text-center max-w-xs">
-            Run a simulation first to start building your analysis history
-          </p>
-        </div>
-      </div>
-    );
+    return <div className="p-8">No history yet</div>;
   }
 
   return (
     <div className="space-y-6 p-8">
-      <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <svg
-              className="w-4 h-4 text-primary"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold">Analysis History</h2>
-        </div>
-        <p className="text-sm text-muted-foreground ml-10">
-          Your analyzed emails and domains
-        </p>
-      </div>
-
       <div className="grid gap-3">
-        {history.map((item, index) => (
-          <div
+        {history.map((item) => (
+          <Card
             key={item.id}
+            className="cursor-pointer hover:bg-muted/50 transition-colors"
             onClick={() => setSelectedItem(item)}
-            onKeyDown={(e) => e.key === "Enter" && setSelectedItem(item)}
-            role="button"
-            tabIndex={0}
-            className="flex items-center justify-between p-4 rounded-xl border bg-card hover:bg-muted/50 transition-all duration-200 ease-out active:scale-[0.98] cursor-pointer"
-            style={{
-              opacity: mounted ? 1 : 0,
-              transform: mounted ? "translateY(0)" : "translateY(8px)",
-              transitionDelay: mounted ? `${index * 50}ms` : "0ms",
-              transitionDuration: "300ms",
-              transitionProperty: "opacity, transform, background-color",
-            }}
           >
-            <div className="min-w-0 flex-1 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-muted-foreground"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
-                  />
-                </svg>
-              </div>
+            <CardContent className="p-4 flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium truncate">
-                  {item.senderEmail || `Report - ${index}`}
+                  {item.senderEmail || "Unknown"}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {item.createdAt
-                    ? new Date(item.createdAt).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })
+                    ? new Date(item.createdAt).toLocaleString()
                     : "Unknown Date"}
                 </p>
               </div>
-            </div>
-            <svg
-              className="w-4 h-4 text-muted-foreground"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
-          </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      {selectedItem && (
-        <HistorySidebar
-          item={selectedItem}
-          onClose={() => setSelectedItem(null)}
-        />
-      )}
+      <HistorySidebar
+        item={selectedItem}
+        open={selectedItem !== null}
+        onClose={() => setSelectedItem(null)}
+      />
     </div>
   );
 }
