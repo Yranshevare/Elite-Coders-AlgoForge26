@@ -1,35 +1,68 @@
 /**
- * Initializes the application with Hot Module Replacement (HMR) support for CSS changes.
- * This module addresses issues with HMR when using inline CSS stylesheets during development.
- * When changes are made to Tailwind CSS or other CSS classes, the dev server typically needs
- * to be stopped and restarted to apply the new styles. This module intercepts CSS changes and
- * applies them dynamically without requiring a full dev server restart, thereby improving
- * development efficiency by providing smoother HMR for CSS changes.
- *
- * @module index.dev
+ * Development entry point for content script.
+ * Gmail email extractor - extracts complete sender, subject, and content
  */
 
-import { createRoot } from 'react-dom/client';
+(() => {
+  // Function to extract complete email details
+  function extractEmailDetails() {
+    try {
+      // Try to find the main email content container
+      // Gmail typically uses these selectors for email content
+      const emailSelectors = [
+        '[data-message-id] [role="presentation"]',
+        '.a3s.aiL',
+        '[role="main"] [role="article"]',
+        '[data-message-id]',
+        '.gs',
+        '[itemprop="description"]'
+      ];
 
-import Content from './Content';
+      let emailElement = null;
+      for (const selector of emailSelectors) {
+        emailElement = document.querySelector(selector);
+        if (emailElement && emailElement.textContent?.trim()) {
+          break;
+        }
+      }
 
-import '@assets/styles/index.css';
+      // If no specific email element found, fall back to body
+      if (!emailElement) {
+        emailElement = document.body;
+      }
 
-const container = document.createElement('div');
+      // Clone the element to avoid modifying the original
+      const clonedElement = emailElement.cloneNode(true) as Element;
 
-// Get the style element corresponding to the CSS file
-const styleElement = document.querySelector('style[data-vite-dev-id]');
+      // Remove all <style> tags
+      const styles = clonedElement.querySelectorAll('style');
+      styles.forEach(style => style.remove());
 
-if (!styleElement) {
-  throw new Error('Style element with attribute data-vite-dev-id not found.');
-}
+      // Remove all <script> tags
+      const scripts = clonedElement.querySelectorAll('script');
+      scripts.forEach(script => script.remove());
 
-// Attach the style element to the shadow root
-const shadowRoot = container.attachShadow({ mode: 'open' });
-shadowRoot.appendChild(styleElement);
+      // Remove all <link> tags with rel="stylesheet"
+      const links = clonedElement.querySelectorAll('link[rel="stylesheet"]');
+      links.forEach(link => link.remove());
 
-document.body.appendChild(container);
+      // Get the clean HTML of the email element
+      const cleanHTML = clonedElement.outerHTML;
 
-// Render the application inside the shadow root
-const root = createRoot(shadowRoot);
-root.render(<Content />);
+      // Print the clean HTML
+      console.log('📧 Email HTML Element:', cleanHTML);
+      return cleanHTML;
+    } catch (error) {
+      console.error('Error extracting HTML:', error);
+      return null;
+    }
+  }
+
+  // Listen for messages from the sidebar - ONLY extract when button is clicked
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message.action === 'extractEmailDetails') {
+      const result = extractEmailDetails();
+      sendResponse({ success: !!result, data: result });
+    }
+  });
+})();

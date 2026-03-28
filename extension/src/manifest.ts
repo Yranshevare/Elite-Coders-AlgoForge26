@@ -13,7 +13,6 @@ export default defineManifest({
   version: packageData.version,
   description: packageData.description,
   action: {
-    default_popup: 'src/popup/index.html',
     default_icon: {
       16: 'icon16.png',
       32: 'icon32.png',
@@ -21,13 +20,16 @@ export default defineManifest({
       128: 'icon128.png',
     },
   },
+  side_panel: {
+    default_path: 'src/sidePanel/index.html',
+  },
   icons: {
     16: 'icon16.png',
     32: 'icon32.png',
     48: 'icon48.png',
     128: 'icon128.png',
   },
-  permissions: ['activeTab', 'storage'],
+  permissions: ['activeTab', 'storage', 'sidePanel', 'scripting'],
   content_scripts: [
     {
       js: isDev
