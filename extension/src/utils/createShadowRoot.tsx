@@ -7,32 +7,15 @@ import { createRoot } from 'react-dom/client';
  */
 export default function createShadowRoot(styles: string) {
   const host = document.createElement('div');
+  host.style.cssText = 'all: initial;';
   const shadow = host.attachShadow({ mode: 'open' });
 
-  // Create an internal mount node to avoid Xray wrapper issues in Firefox
+  const styleEl = document.createElement('style');
+  styleEl.textContent = styles;
+  shadow.appendChild(styleEl);
+
   const mount = document.createElement('div');
   shadow.appendChild(mount);
-
-  // Apply styles: prefer constructable stylesheets, fallback safely
-  try {
-    const supportsConstructable =
-      'adoptedStyleSheets' in shadow &&
-      'replaceSync' in
-        (CSSStyleSheet.prototype as unknown as { replaceSync?: unknown });
-    if (supportsConstructable) {
-      const sheet = new CSSStyleSheet();
-      sheet.replaceSync(styles);
-      shadow.adoptedStyleSheets = [sheet];
-    } else {
-      const styleEl = document.createElement('style');
-      styleEl.textContent = styles;
-      shadow.appendChild(styleEl);
-    }
-  } catch {
-    const styleEl = document.createElement('style');
-    styleEl.textContent = styles;
-    shadow.appendChild(styleEl);
-  }
 
   document.body.appendChild(host);
   return createRoot(mount);
