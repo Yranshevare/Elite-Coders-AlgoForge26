@@ -87,10 +87,18 @@ function errorResponse(message: string, status: number): Response {
   });
 }
 
+interface EmailData {
+  senderEmail?: string;
+  emailSubject?: string;
+  emailBody?: string;
+  links?: string[];
+}
+
 async function handleRequest(
   raw: string,
   userId: string,
   historyId?: string,
+  emailData?: EmailData,
 ): Promise<Response> {
   const domain = extractDomain(raw.trim());
 
@@ -218,12 +226,17 @@ Respond ONLY with valid JSON in this exact format:
         } else {
           await db.insert(history).values({
             userId,
+            senderEmail: emailData?.senderEmail,
+            emailSubject: emailData?.emailSubject,
+            emailBody: emailData?.emailBody,
+            links: emailData?.links ? JSON.stringify(emailData.links) : null,
             llmPrediction: ruleBasedVerdict,
             dnsLookupResult: dnsJson,
             googleSafeBrowsingResult: safeBrowsingJson,
             mlResponse: JSON.stringify(ml),
             finalAiVerdict: aiVerdictJson,
             attachmentCount: 0,
+            createdAt: Date.now(),
           });
         }
 
@@ -282,12 +295,12 @@ export async function POST(req: NextRequest): Promise<Response> {
   if (typeof body !== "object" || body === null)
     return errorResponse("Invalid request body", 400);
 
-  const { domain, userId, historyId } = body as RequestBody;
+  const { domain, userId, historyId, senderEmail, emailSubject, emailBody, links } = body as RequestBody;
 
   if (typeof domain !== "string" || domain.trim() === "")
     return errorResponse("domain must be a non-empty string", 400);
   if (typeof userId !== "string" || userId.trim() === "")
     return errorResponse("userId must be a non-empty string", 400);
 
-  return handleRequest(domain, userId, historyId);
+  return handleRequest(domain, userId, historyId, { senderEmail, emailSubject, emailBody, links });
 }

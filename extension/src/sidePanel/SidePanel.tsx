@@ -291,7 +291,14 @@ export default function SidePanel() {
       const response = await fetch("http://localhost:3000/api/ai-verdict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domain, userId }),
+        body: JSON.stringify({
+          domain,
+          userId,
+          senderEmail: emailData?.senderEmail,
+          emailSubject: emailData?.subject,
+          emailBody: emailData?.body,
+          links: emailData?.links,
+        }),
       });
       if (!response.ok) throw new Error(`Request failed: ${response.status}`);
 

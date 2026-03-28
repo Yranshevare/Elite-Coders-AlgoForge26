@@ -27,6 +27,10 @@ export interface RequestBody {
   domain: string;
   userId: string;
   historyId?: string;
+  senderEmail?: string;
+  emailSubject?: string;
+  emailBody?: string;
+  links?: string[];
 }
 
 export interface FinalResponse {
