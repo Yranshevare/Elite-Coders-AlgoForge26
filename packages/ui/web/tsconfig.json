@@ -7,6 +7,7 @@
       "@/*": ["./src/*"],
       "@/components/*": ["./src/*"],
       "@/lib/*": ["./src/*"],
+      "@/lib/utils": ["./src/utils.ts"],
       "@/hooks/*": ["./src/hooks/*"]
     },
     "lib": ["dom", "dom.iterable", "esnext"],
