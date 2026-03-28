@@ -23,6 +23,14 @@ type AiVerdict = {
   recommendation: string;
 };
 
+type UrlAnalysisResult = {
+  url: string;
+  domain: string;
+  steps: AnalysisStep[];
+  verdict: AiVerdict | null;
+  status: "pending" | "analyzing" | "completed" | "error";
+};
+
 const C = {
   bg: "#f8f9fb",
   surface: "#ffffff",
@@ -159,13 +167,8 @@ export default function SidePanel() {
   const [userId, setUserId] = useState("");
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [analyzingDomain, setAnalyzingDomain] = useState<string | null>(null);
-  const [analysisSteps, setAnalysisSteps] = useState<AnalysisStep[]>([
-    { id: "dns", title: "DNS Analysis", status: "pending" },
-    { id: "safebrowsing", title: "Safe Browsing", status: "pending" },
-    { id: "ml", title: "ML Prediction", status: "pending" },
-    { id: "ai", title: "Final Verdict", status: "pending" },
-  ]);
-  const [finalVerdict, setFinalVerdict] = useState<AiVerdict | null>(null);
+  const [urlResults, setUrlResults] = useState<UrlAnalysisResult[]>([]);
+  const [currentUrlIndex, setCurrentUrlIndex] = useState(0);
   const analysisRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -254,24 +257,35 @@ export default function SidePanel() {
     }
   };
 
-  const handleAnalyseEmail = async () => {
-    if (!emailData || !emailData.links?.length || !userId) return;
-    const domain = extractDomain(emailData.links[0]);
-    if (!domain) return;
+  const analyzeSingleUrl = async (url: string, index: number) => {
+    const domain = extractDomain(url);
+    if (!domain) {
+      setUrlResults((prev) =>
+        prev.map((r, i) =>
+          i === index ? { ...r, status: "error", steps: [] } : r,
+        ),
+      );
+      return;
+    }
 
-    setAnalyzingDomain(domain);
-    setShowAnalysis(true);
-    setFinalVerdict(null);
-    setAnalysisSteps([
-      { id: "dns", title: "DNS Analysis", status: "running" },
-      { id: "safebrowsing", title: "Safe Browsing", status: "pending" },
-      { id: "ml", title: "ML Prediction", status: "pending" },
-      { id: "ai", title: "Final Verdict", status: "pending" },
-    ]);
-    setTimeout(
-      () => analysisRef.current?.scrollIntoView({ behavior: "smooth" }),
-      100,
+    setUrlResults((prev) =>
+      prev.map((r, i) =>
+        i === index
+          ? {
+              ...r,
+              domain,
+              status: "analyzing",
+              steps: [
+                { id: "dns", title: "DNS Analysis", status: "running" },
+                { id: "safebrowsing", title: "Safe Browsing", status: "pending" },
+                { id: "ml", title: "ML Prediction", status: "pending" },
+                { id: "ai", title: "Final Verdict", status: "pending" },
+              ],
+            }
+          : r,
+      ),
     );
+    setAnalyzingDomain(domain);
 
     try {
       const response = await fetch("http://localhost:3000/api/ai-verdict", {
@@ -298,59 +312,96 @@ export default function SidePanel() {
             const raw = block.match(/data:\s*(\{.*\})/s)?.[1]?.trim();
             if (!eType || !raw || raw === "[DONE]") continue;
             const data = JSON.parse(raw);
+
             if (eType === "dns") {
-              setAnalysisSteps((p) =>
-                p.map((s) =>
-                  s.id === "dns"
+              setUrlResults((prev) =>
+                prev.map((r, i) =>
+                  i === index
                     ? {
-                        ...s,
-                        status: "completed",
-                        data: { ...data.result, domain: data.domain },
+                        ...r,
+                        steps: r.steps.map((s) =>
+                          s.id === "dns"
+                            ? {
+                                ...s,
+                                status: "completed",
+                                data: { ...data.result, domain: data.domain },
+                              }
+                            : s.id === "safebrowsing"
+                              ? { ...s, status: "running" }
+                              : s,
+                        ),
                       }
-                    : s.id === "safebrowsing"
-                      ? { ...s, status: "running" }
-                      : s,
+                    : r,
                 ),
               );
             } else if (eType === "safebrowsing") {
-              setAnalysisSteps((p) =>
-                p.map((s) =>
-                  s.id === "safebrowsing"
-                    ? { ...s, status: "completed", data }
-                    : s.id === "ml"
-                      ? { ...s, status: "running" }
-                      : s,
+              setUrlResults((prev) =>
+                prev.map((r, i) =>
+                  i === index
+                    ? {
+                        ...r,
+                        steps: r.steps.map((s) =>
+                          s.id === "safebrowsing"
+                            ? { ...s, status: "completed", data }
+                            : s.id === "ml"
+                              ? { ...s, status: "running" }
+                              : s,
+                        ),
+                      }
+                    : r,
                 ),
               );
             } else if (eType === "ml") {
-              console.log(data);
-              setAnalysisSteps((p) =>
-                p.map((s) =>
-                  s.id === "ml"
-                    ? { ...s, status: "completed", data }
-                    : s.id === "ai"
-                      ? { ...s, status: "running" }
-                      : s,
+              setUrlResults((prev) =>
+                prev.map((r, i) =>
+                  i === index
+                    ? {
+                        ...r,
+                        steps: r.steps.map((s) =>
+                          s.id === "ml"
+                            ? { ...s, status: "completed", data }
+                            : s.id === "ai"
+                              ? { ...s, status: "running" }
+                              : s,
+                        ),
+                      }
+                    : r,
                 ),
               );
             } else if (eType === "ai_final") {
-              setFinalVerdict(data);
-              setAnalysisSteps((p) =>
-                p.map((s) =>
-                  s.id === "ai" ? { ...s, status: "completed", data } : s,
+              setUrlResults((prev) =>
+                prev.map((r, i) =>
+                  i === index
+                    ? {
+                        ...r,
+                        verdict: data,
+                        steps: r.steps.map((s) =>
+                          s.id === "ai" ? { ...s, status: "completed", data } : s,
+                        ),
+                        status: "completed",
+                      }
+                    : r,
                 ),
               );
               setAnalyzingDomain(null);
             } else if (eType === "error") {
-              setAnalysisSteps((p) =>
-                p.map((s) =>
-                  s.status === "running"
+              setUrlResults((prev) =>
+                prev.map((r, i) =>
+                  i === index
                     ? {
-                        ...s,
+                        ...r,
                         status: "error",
-                        details: data?.error || "Unknown error",
+                        steps: r.steps.map((s) =>
+                          s.status === "running"
+                            ? {
+                                ...s,
+                                status: "error",
+                                details: data?.error || "Unknown error",
+                              }
+                            : s,
+                        ),
                       }
-                    : s,
+                    : r,
                 ),
               );
               setAnalyzingDomain(null);
@@ -363,14 +414,49 @@ export default function SidePanel() {
         }
       }
     } catch (error) {
-      setAnalysisSteps((p) =>
-        p.map((s) =>
-          s.status === "running"
-            ? { ...s, status: "error", details: (error as Error).message }
-            : s,
+      setUrlResults((prev) =>
+        prev.map((r, i) =>
+          i === index
+            ? {
+                ...r,
+                status: "error",
+                steps: r.steps.map((s) =>
+                  s.status === "running"
+                    ? { ...s, status: "error", details: (error as Error).message }
+                    : s,
+                ),
+              }
+            : r,
         ),
       );
       setAnalyzingDomain(null);
+    }
+  };
+
+  const handleAnalyseEmail = async () => {
+    if (!emailData || !emailData.links?.length || !userId) return;
+
+    const initialResults: UrlAnalysisResult[] = emailData.links.map((link) => ({
+      url: link,
+      domain: extractDomain(link) || "",
+      steps: [],
+      verdict: null,
+      status: "pending" as const,
+    }));
+
+    setUrlResults(initialResults);
+    setCurrentUrlIndex(0);
+    setShowAnalysis(true);
+    setAnalyzingDomain(null);
+
+    setTimeout(
+      () => analysisRef.current?.scrollIntoView({ behavior: "smooth" }),
+      100,
+    );
+
+    for (let i = 0; i < emailData.links.length; i++) {
+      setCurrentUrlIndex(i);
+      await analyzeSingleUrl(emailData.links[i], i);
     }
   };
 
@@ -731,13 +817,15 @@ export default function SidePanel() {
             )}
 
             {/* Analysis */}
-            {showAnalysis && (
+            {showAnalysis && urlResults.length > 0 && (
               <div
                 ref={analysisRef}
-                style={{ ...card, height: "50%", overflowY: "auto" }}
+                style={{ ...card, maxHeight: "70%", overflowY: "auto" }}
               >
                 <div style={cardHead}>
-                  <span style={label10}>Analysis</span>
+                  <span style={label10}>
+                    Analysis ({currentUrlIndex + 1}/{urlResults.length})
+                  </span>
                   {analyzingDomain && (
                     <span
                       style={{
@@ -754,315 +842,165 @@ export default function SidePanel() {
                   )}
                 </div>
 
-                {analysisSteps.map((step, idx) => (
-                  <div
-                    key={step.id}
-                    style={{
-                      padding: "9px 12px",
-                      borderTop:
-                        idx === 0 ? "none" : `1px solid ${C.borderFaint}`,
-                    }}
-                  >
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 8 }}
-                    >
-                      <StepIcon status={step.status} />
-                      <span
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 500,
-                          color:
-                            step.status === "completed"
-                              ? C.textPrimary
-                              : step.status === "running"
-                                ? C.runningColor
-                                : step.status === "error"
-                                  ? C.redText
-                                  : "#334155",
-                        }}
-                      >
-                        {step.title}
-                      </span>
-                    </div>
-
-                    {step.data && step.id === "dns" && (
+                <div style={{ overflowY: "auto" }}>
+                  {urlResults.map((result, rIdx) => (
+                    <div key={rIdx}>
                       <div
                         style={{
-                          marginTop: 6,
-                          marginLeft: 24,
-                          display: "grid",
-                          gridTemplateColumns: "1fr 1fr",
-                          gap: "2px 8px",
-                        }}
-                      >
-                        {(
-                          [
-                            {
-                              k: "Domain",
-                              v: (step.data as any).domain,
-                              c: C.textSecondary,
-                            },
-                            {
-                              k: "Age",
-                              v: `${(step.data as any).age_days}d`,
-                              c: C.textSecondary,
-                            },
-                            {
-                              k: "DNSSEC",
-                              v: (step.data as any).dnssec_valid
-                                ? "Valid"
-                                : "Unsigned",
-                              c: (step.data as any).dnssec_valid
-                                ? C.greenText
-                                : C.amberText,
-                            },
-                            {
-                              k: "Flux",
-                              v: (step.data as any).flux_score,
-                              c: C.textSecondary,
-                            },
-                            {
-                              k: "VT threats",
-                              v: (step.data as any).vt_malicious,
-                              c:
-                                (step.data as any).vt_malicious > 0
-                                  ? C.redText
-                                  : C.greenText,
-                            },
-                            {
-                              k: "Reputation",
-                              v: (step.data as any).vt_reputation,
-                              c: C.textSecondary,
-                            },
-                          ] as { k: string; v: unknown; c: string }[]
-                        ).map(({ k, v, c }) => (
-                          <div
-                            key={k}
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span style={{ fontSize: 10, color: "#334155" }}>
-                              {k}
-                            </span>
-                            <span
-                              style={{
-                                fontSize: 10,
-                                fontWeight: 500,
-                                color: c,
-                                maxWidth: 80,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {String(v)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {step.data && step.id === "safebrowsing" && (
-                      <div style={{ marginTop: 6, marginLeft: 24 }}>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            fontSize: 10,
-                            fontWeight: 500,
-                            padding: "2px 7px",
-                            borderRadius: 5,
-                            background: (step.data as any).isSafe
-                              ? "rgba(16,185,129,0.12)"
-                              : "rgba(239,68,68,0.12)",
-                            color: (step.data as any).isSafe
-                              ? C.greenText
-                              : C.redText,
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: 5,
-                              height: 5,
-                              borderRadius: "50%",
-                              background: (step.data as any).isSafe
-                                ? C.green
-                                : C.red,
-                              display: "inline-block",
-                            }}
-                          />
-                          {(step.data as any).isSafe
-                            ? "No threats detected"
-                            : "Threats found"}
-                        </span>
-                      </div>
-                    )}
-
-                    {step.data && step.id === "ml" && (
-                      <div
-                        style={{
-                          marginTop: 6,
-                          marginLeft: 24,
+                          padding: "8px 12px",
+                          background:
+                            rIdx === currentUrlIndex && result.status === "analyzing"
+                              ? "rgba(99,102,241,0.08)"
+                              : "transparent",
+                          borderBottom: `1px solid ${C.borderFaint}`,
                           display: "flex",
-                          gap: 8,
+                          alignItems: "center",
+                          justifyContent: "space-between",
                         }}
                       >
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            fontSize: 10,
-                            fontWeight: 500,
-                            padding: "2px 7px",
-                            borderRadius: 5,
-                            background:
-                              (step.data as any).prediction === "good"
-                                ? "rgba(16,185,129,0.12)"
-                                : "rgba(239,68,68,0.12)",
-                            color:
-                              (step.data as any).prediction === "good"
-                                ? C.greenText
-                                : C.redText,
-                          }}
-                        >
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          {result.status === "completed" && (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2">
+                              <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                          )}
+                          {result.status === "analyzing" && <Spinner size={14} />}
+                          {result.status === "error" && (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.red} strokeWidth="2">
+                              <circle cx="12" cy="12" r="10" />
+                              <path d="M15 9l-6 6M9 9l6 6" />
+                            </svg>
+                          )}
+                          {result.status === "pending" && (
+                            <div style={{ width: 14, height: 14, borderRadius: "50%", background: C.border }} />
+                          )}
                           <span
                             style={{
-                              width: 5,
-                              height: 5,
-                              borderRadius: "50%",
-                              display: "inline-block",
-                              background:
-                                (step.data as any).prediction === "good"
-                                  ? C.green
-                                  : C.red,
-                            }}
-                          />
-                          {(step.data as any).prediction === "good"
-                            ? "Looks legitimate"
-                            : "Likely malicious"}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: 10,
-                            color: C.textMuted,
-                            alignSelf: "center",
-                          }}
-                        >
-                          {Math.round((step.data as any).raw?.good * 100)}% good
-                        </span>
-                      </div>
-                    )}
-
-                    {step.details && (
-                      <p
-                        style={{
-                          marginTop: 4,
-                          marginLeft: 24,
-                          fontSize: 10,
-                          color: C.redText,
-                        }}
-                      >
-                        {step.details}
-                      </p>
-                    )}
-                  </div>
-                ))}
-
-                {finalVerdict &&
-                  (() => {
-                    const cfg =
-                      verdictCfg[finalVerdict.verdict] ?? verdictCfg.SUSPICIOUS;
-                    return (
-                      <div
-                        style={{
-                          margin: "4px 10px 10px",
-                          borderRadius: 10,
-                          padding: "10px 12px",
-                          border: `1px solid ${cfg.border}`,
-                          background: cfg.bg,
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            marginBottom: 6,
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: "#fff",
-                              background: cfg.badge,
-                              padding: "3px 8px",
-                              borderRadius: 5,
+                              fontSize: 11,
+                              fontWeight: 500,
+                              color: C.textPrimary,
+                              maxWidth: 180,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
                             }}
                           >
-                            {finalVerdict.verdict}
-                          </span>
-                          <span style={{ fontSize: 10, color: C.textMuted }}>
-                            {Math.round(finalVerdict.confidence * 100)}%
-                            confidence
+                            {result.domain || result.url}
                           </span>
                         </div>
-                        <p
-                          style={{
-                            fontSize: 11,
-                            color: cfg.text,
-                            marginBottom: 6,
-                            lineHeight: 1.5,
-                          }}
-                        >
-                          {finalVerdict.recommendation}
-                        </p>
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 3,
-                          }}
-                        >
-                          {finalVerdict.reasons.map((r, i) => (
+                        {result.verdict && (
+                          <span
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 600,
+                              padding: "2px 6px",
+                              borderRadius: 4,
+                              background:
+                                result.verdict.verdict === "SAFE"
+                                  ? "rgba(16,185,129,0.15)"
+                                  : result.verdict.verdict === "SUSPICIOUS"
+                                    ? "rgba(245,158,11,0.15)"
+                                    : "rgba(239,68,68,0.15)",
+                              color:
+                                result.verdict.verdict === "SAFE"
+                                  ? C.greenText
+                                  : result.verdict.verdict === "SUSPICIOUS"
+                                    ? C.amberText
+                                    : C.redText,
+                            }}
+                          >
+                            {result.verdict.verdict}
+                          </span>
+                        )}
+                      </div>
+
+                      {result.status !== "pending" && result.steps.length > 0 && (
+                        <div style={{ padding: "8px 12px", background: "rgba(0,0,0,0.02)" }}>
+                          {result.steps.map((step, idx) => (
                             <div
-                              key={i}
+                              key={step.id}
                               style={{
-                                display: "flex",
-                                gap: 5,
-                                alignItems: "flex-start",
+                                padding: "6px 0",
+                                borderTop: idx === 0 ? "none" : `1px solid ${C.borderFaint}`,
                               }}
                             >
-                              <div
-                                style={{
-                                  width: 4,
-                                  height: 4,
-                                  borderRadius: "50%",
-                                  background: cfg.dot,
-                                  marginTop: 4,
-                                  flexShrink: 0,
-                                }}
-                              />
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  color: C.textMuted,
-                                  lineHeight: 1.5,
-                                }}
-                              >
-                                {r}
-                              </span>
+                              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                <StepIcon status={step.status} />
+                                <span
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 500,
+                                    color: step.status === "completed" ? C.textPrimary : step.status === "running" ? C.runningColor : step.status === "error" ? C.redText : "#334155",
+                                  }}
+                                >
+                                  {step.title}
+                                </span>
+                              </div>
+
+                              {step.data && step.id === "dns" && (
+                                <div style={{ marginTop: 4, marginLeft: 24, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2px 8px" }}>
+                                  {([
+                                    { k: "Domain", v: (step.data as any).domain, c: C.textSecondary },
+                                    { k: "Age", v: `${(step.data as any).age_days}d`, c: C.textSecondary },
+                                    { k: "DNSSEC", v: (step.data as any).dnssec_valid ? "Valid" : "Unsigned", c: (step.data as any).dnssec_valid ? C.greenText : C.amberText },
+                                    { k: "Flux", v: (step.data as any).flux_score, c: C.textSecondary },
+                                    { k: "VT", v: (step.data as any).vt_malicious, c: (step.data as any).vt_malicious > 0 ? C.redText : C.greenText },
+                                    { k: "Rep", v: (step.data as any).vt_reputation, c: C.textSecondary },
+                                  ] as { k: string; v: unknown; c: string }[]).map(({ k, v, c }) => (
+                                    <div key={k} style={{ display: "flex", justifyContent: "space-between" }}>
+                                      <span style={{ fontSize: 9, color: "#334155" }}>{k}</span>
+                                      <span style={{ fontSize: 9, fontWeight: 500, color: c }}>{String(v)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {step.data && step.id === "safebrowsing" && (
+                                <div style={{ marginTop: 4, marginLeft: 24 }}>
+                                  <span style={{ fontSize: 9, fontWeight: 500, padding: "2px 6px", borderRadius: 4, background: (step.data as any).isSafe ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)", color: (step.data as any).isSafe ? C.greenText : C.redText }}>
+                                    {(step.data as any).isSafe ? "Safe" : "Threats"}
+                                  </span>
+                                </div>
+                              )}
+
+                              {step.data && step.id === "ml" && (
+                                <div style={{ marginTop: 4, marginLeft: 24, display: "flex", gap: 8 }}>
+                                  <span style={{ fontSize: 9, fontWeight: 500, padding: "2px 6px", borderRadius: 4, background: (step.data as any).prediction === "good" ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)", color: (step.data as any).prediction === "good" ? C.greenText : C.redText }}>
+                                    {(step.data as any).prediction === "good" ? "Legitimate" : "Malicious"}
+                                  </span>
+                                  <span style={{ fontSize: 9, color: C.textMuted }}>{Math.round((step.data as any).raw?.good * 100)}%</span>
+                                </div>
+                              )}
+
+                              {step.details && <p style={{ marginTop: 2, marginLeft: 24, fontSize: 9, color: C.redText }}>{step.details}</p>}
                             </div>
                           ))}
+
+                          {result.verdict && (() => {
+                            const cfg = verdictCfg[result.verdict.verdict] ?? verdictCfg.SUSPICIOUS;
+                            return (
+                              <div style={{ margin: "8px 0", borderRadius: 8, padding: "8px 10px", border: `1px solid ${cfg.border}`, background: cfg.bg }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                                  <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", background: cfg.badge, padding: "2px 6px", borderRadius: 4 }}>{result.verdict.verdict}</span>
+                                  <span style={{ fontSize: 9, color: C.textMuted }}>{Math.round(result.verdict.confidence * 100)}%</span>
+                                </div>
+                                <p style={{ fontSize: 10, color: cfg.text, marginBottom: 4, lineHeight: 1.4 }}>{result.verdict.recommendation}</p>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                  {result.verdict.reasons.map((r, i) => (
+                                    <div key={i} style={{ display: "flex", gap: 4, alignItems: "flex-start" }}>
+                                      <div style={{ width: 3, height: 3, borderRadius: "50%", background: cfg.dot, marginTop: 4, flexShrink: 0 }} />
+                                      <span style={{ fontSize: 9, color: C.textMuted, lineHeight: 1.4 }}>{r}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
-                      </div>
-                    );
-                  })()}
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </>
