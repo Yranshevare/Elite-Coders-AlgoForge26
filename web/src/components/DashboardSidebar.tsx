@@ -57,13 +57,6 @@ export function DashboardSidebar({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium truncate">{user.email}</p>
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-              </span>
-              <p className="text-xs text-muted-foreground">Free Plan</p>
-            </div>
           </div>
         </div>
       </div>
@@ -148,15 +141,6 @@ export function DashboardSidebar({
       </nav>
 
       <div className="p-4 border-t">
-        <div className="p-3 rounded-xl bg-muted/30 mb-3">
-          <p className="text-xs text-muted-foreground mb-2">Protected</p>
-          <div className="flex items-center gap-2">
-            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-              <div className="h-full w-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full" />
-            </div>
-            <span className="text-xs font-medium text-green-600">100%</span>
-          </div>
-        </div>
         <Button
           variant="ghost"
           size="sm"

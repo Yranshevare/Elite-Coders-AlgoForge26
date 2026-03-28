@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
 
 interface EmailLink {
   text: string;
@@ -22,87 +22,80 @@ interface EmailDetailProps {
   email: Email;
   onBack: () => void;
   onLinkClick: (link: EmailLink) => void;
+  onOpenExtension: () => void;
 }
 
-export function EmailDetail({ email, onBack, onLinkClick }: EmailDetailProps) {
-  return (
-    <div className="space-y-4">
-      <button
-        type="button"
-        onClick={onBack}
-        className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors group"
-      >
-        <svg
-          className="w-4 h-4 transition-transform group-hover:-translate-x-0.5"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          aria-hidden="true"
-        >
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
-        Back to inbox
-      </button>
+export function EmailDetail({
+  email,
+  onBack,
+  onLinkClick,
+  onOpenExtension,
+}: EmailDetailProps) {
+  const [mounted, setMounted] = useState(false);
 
-      <div className="rounded-2xl border bg-card overflow-hidden shadow-lg shadow-black/5">
-        <div
-          className={cn(
-            "px-6 py-4 border-b",
-            email.isPhishing
-              ? "bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-950/30 dark:to-card"
-              : "bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-card",
-          )}
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  return (
+    <div
+      className="space-y-4"
+      style={{
+        opacity: mounted ? 1 : 0,
+        transform: mounted ? "translateY(0)" : "translateY(12px)",
+        transition: "opacity 250ms ease-out, transform 250ms ease-out",
+      }}
+    >
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors group"
         >
+          <svg
+            className="w-4 h-4 transition-transform group-hover:-translate-x-0.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          Back
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpenExtension}
+          className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+        >
+          <svg
+            className="w-4 h-4"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+            />
+          </svg>
+          Extension
+        </button>
+      </div>
+
+      <div className="rounded-2xl border bg-card overflow-hidden">
+        <div className="px-6 py-4 border-b bg-muted/30">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {email.isPhishing ? (
-                <>
-                  <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
-                    <svg
-                      className="w-4 h-4 text-red-600 dark:text-red-400"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-                      />
-                    </svg>
-                  </div>
-                  <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-400">
-                    ⚠️ Phishing Detected
-                  </span>
-                </>
-              ) : (
-                <>
-                  <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
-                    <svg
-                      className="w-4 h-4 text-green-600 dark:text-green-400"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      aria-hidden="true"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                      />
-                    </svg>
-                  </div>
-                  <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400">
-                    ✓ Safe Email
-                  </span>
-                </>
-              )}
+              <span className="text-xs text-muted-foreground">
+                {email.date}
+              </span>
             </div>
-            <span className="text-xs text-muted-foreground">{email.date}</span>
           </div>
         </div>
 
@@ -129,79 +122,36 @@ export function EmailDetail({ email, onBack, onLinkClick }: EmailDetailProps) {
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Links in this email ({email.links.length})
                 </p>
-                {email.links.map((link, idx) => (
+                {email.links.map((link, index) => (
                   <button
-                    key={idx}
+                    key={`${link.text}-${link.url}`}
                     type="button"
                     onClick={() => onLinkClick(link)}
-                    className={cn(
-                      "block w-full text-left p-4 rounded-xl border-2 transition-all duration-200 hover:shadow-lg",
-                      link.isPhishing
-                        ? "bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-950/30 dark:to-card border-red-200 dark:border-red-800/30 hover:border-red-400 hover:shadow-red-500/10"
-                        : "bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-card border-green-200 dark:border-green-800/30 hover:border-green-400 hover:shadow-green-500/10",
-                    )}
+                    className="block w-full text-left p-4 rounded-xl border bg-muted/50 hover:bg-muted transition-all duration-200 ease-out active:scale-[0.98]"
+                    style={{
+                      transitionDelay: `${index * 50}ms`,
+                    }}
                   >
                     <span className="flex items-center justify-between">
-                      <span
-                        className={cn(
-                          "font-semibold",
-                          link.isPhishing
-                            ? "text-red-700 dark:text-red-300"
-                            : "text-green-700 dark:text-green-300",
-                        )}
-                      >
+                      <span className="font-semibold text-blue-600">
                         {link.text}
                       </span>
-                      {link.isPhishing ? (
-                        <svg
-                          className="w-5 h-5 text-red-500"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          aria-hidden="true"
-                        >
-                          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                          <polyline points="15,3 21,3 21,9" />
-                          <line x1="10" y1="14" x2="21" y2="3" />
-                        </svg>
-                      ) : (
-                        <svg
-                          className="w-5 h-5 text-green-500"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          aria-hidden="true"
-                        >
-                          <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                          <polyline points="15,3 21,3 21,9" />
-                          <line x1="10" y1="14" x2="21" y2="3" />
-                        </svg>
-                      )}
+                      <svg
+                        className="w-5 h-5 text-muted-foreground"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        aria-hidden="true"
+                      >
+                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                        <polyline points="15,3 21,3 21,9" />
+                        <line x1="10" y1="14" x2="21" y2="3" />
+                      </svg>
                     </span>
                     <span className="text-xs text-muted-foreground block mt-2 truncate">
                       {link.url}
                     </span>
-                    {link.isPhishing && (
-                      <span className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-red-600 dark:text-red-400">
-                        <svg
-                          className="w-3 h-3"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          aria-hidden="true"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"
-                          />
-                        </svg>
-                        Suspicious - May steal your information
-                      </span>
-                    )}
                   </button>
                 ))}
               </div>
