@@ -1,0 +1,14 @@
+{
+  "name": "elite-coders-algoforge26",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "web": "cd web && bun run dev",
+    "build": "cd extension && pnpm run build",
+    "ML": "cd agent && uv run src/main.py"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

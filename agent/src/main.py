@@ -14,7 +14,7 @@ def predict():
         
     
         if not data or 'url' not in data:
-            return jsonify({"error": "URL is required"}), 400
+            return jsonify({"error": "URL is required", "status": "error"}), 400
 
         url = data['url']
 

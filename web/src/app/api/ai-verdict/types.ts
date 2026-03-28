@@ -40,3 +40,14 @@ export interface FinalResponse {
 export interface ApiErrorResponse {
   error: string;
 }
+
+export interface MlResponse{
+    error:boolean,
+    success: string,
+    raw?: {
+        good: number;
+        bad: number
+    },
+    prediction?: "bad" | "good"
+
+}

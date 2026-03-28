@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createGroq } from "@ai-sdk/groq";
 import { generateText } from "ai";
 import { z } from "zod";
@@ -13,10 +13,12 @@ import {
 } from "../dns-lookup/child-fn";
 import {
   AiVerdictSchema,
+  MlResponse,
   RequestBody,
   SafeBrowsingMatch,
   SafeBrowsingResult,
 } from "./types";
+import { mlClient } from "@/lib/api/client";
 
 const safebrowsing = google.safebrowsing("v4");
 const groq = createGroq({
@@ -33,6 +35,7 @@ function parseJsonFromText(text: string): unknown {
   }
 }
 
+// google safe browsing
 async function runSafeBrowsing(url: string): Promise<SafeBrowsingResult> {
   try {
     const res = await safebrowsing.threatMatches.find({
@@ -56,6 +59,27 @@ async function runSafeBrowsing(url: string): Promise<SafeBrowsingResult> {
   }
 }
 
+// Ml prediction
+async function predict(url: string): Promise<MlResponse> {
+    try {
+        const res = await mlClient.post("/predict", { url });
+        
+        if (!res) return { error: true, success: "error" };
+
+        return {
+            error: false,
+            success: "success",
+            raw: res.data.raw,
+            prediction: res.data.prediction,
+        }
+    } catch (error) {
+        return {
+            error: true,
+            success: "error",
+        };
+    }
+}
+
 function errorResponse(message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
@@ -74,10 +98,22 @@ async function handleRequest(
     return errorResponse("Invalid domain", 422);
   }
 
-  const [dnsSettled, safeBrowsingSettled] = await Promise.allSettled([
+
+//   console.log(raw)
+    // TODO: ml
+const [dnsSettled, safeBrowsingSettled, mlResponse] = await Promise.allSettled([
     dnsPhishingCheck(domain),
     runSafeBrowsing(`https://${domain}`),
-  ]);
+    predict(raw),
+]);
+
+//   console.log({ dnsSettled, safeBrowsingSettled, mlResponse });
+
+  let ml: MlResponse = { error: true, success: "error" };
+  if (mlResponse.status === "fulfilled") {
+    ml = mlResponse.value;
+  }
+
 
   if (dnsSettled.status === "rejected") {
     return errorResponse("DNS lookup failed", 500);
@@ -101,6 +137,7 @@ async function handleRequest(
 
       send("dns", { domain, ruleBasedVerdict, result: dns });
       send("safebrowsing", safeBrowsing);
+      send("ml", ml);
 
       try {
         const prompt = `You are a cybersecurity expert specializing in phishing detection. Analyze the following data about a domain and provide a final verdict.
@@ -127,6 +164,11 @@ Google Safe Browsing:
               ? "none"
               : JSON.stringify(safeBrowsing.matches)
           }
+
+ML Prediction:
+- Error: ${ml.error}
+- Prediction: ${ml.prediction || "N/A"}
+- Raw scores: good: ${ml.raw?.good || "N/A"}, bad: ${ml.raw?.bad || "N/A"}
 
 Rule-based verdict: ${ruleBasedVerdict}
 
@@ -170,6 +212,7 @@ Respond ONLY with valid JSON in this exact format:
             .set({
               dnsLookupResult: dnsJson,
               googleSafeBrowsingResult: safeBrowsingJson,
+              mlResponse: JSON.stringify(ml),
               finalAiVerdict: aiVerdictJson,
             })
             .where(eq(history.id, historyId));
@@ -179,6 +222,7 @@ Respond ONLY with valid JSON in this exact format:
             llmPrediction: ruleBasedVerdict,
             dnsLookupResult: dnsJson,
             googleSafeBrowsingResult: safeBrowsingJson,
+            mlResponse: JSON.stringify(ml),
             finalAiVerdict: aiVerdictJson,
             attachmentCount: 0,
           });
@@ -190,6 +234,7 @@ Respond ONLY with valid JSON in this exact format:
           aiVerdict,
           result: dns,
           safeBrowsing,
+          ml,
         });
       } catch (err) {
         send("error", {
@@ -208,6 +253,8 @@ Respond ONLY with valid JSON in this exact format:
       Connection: "keep-alive",
     },
   });
+
+    // return NextResponse.json({ error: "Not implemented", data:{ dnsSettled, safeBrowsingSettled, mlResponse } }, { status: 200 });
 }
 
 export async function GET(req: NextRequest): Promise<Response> {

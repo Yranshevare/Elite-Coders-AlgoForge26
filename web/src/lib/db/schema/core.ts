@@ -23,6 +23,7 @@ export const history = sqliteTable("history", {
   llmPrediction: text("llm_prediction").notNull(),
   dnsLookupResult: text("dns_lookup_result"),
   googleSafeBrowsingResult: text("google_safe_browsing_result"),
+  mlResponse: text("ml_response"),
   finalAiVerdict: text("final_ai_verdict"),
   attachments: text("attachments"),
 });
