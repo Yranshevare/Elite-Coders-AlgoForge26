@@ -9,6 +9,17 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "fallback_secret_change_me",
 );
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Credentials": "true",
+};
+
+function jsonResponse(body: unknown, status = 200) {
+  return NextResponse.json(body, { status, headers: CORS_HEADERS });
+}
+
 export async function GET() {
   try {
     const cookieStore = await cookies();
@@ -21,7 +32,7 @@ export async function GET() {
     const { payload } = await jwtVerify(token, JWT_SECRET);
 
     if (!payload.userId) {
-      return NextResponse.json({ user: null }, { status: 200 });
+      return jsonResponse({ user: null }, 200);
     }
 
     const users = await db
@@ -33,10 +44,10 @@ export async function GET() {
     const currentUser = users[0];
 
     if (!currentUser) {
-      return NextResponse.json({ user: null }, { status: 200 });
+      return jsonResponse({ user: null }, 200);
     }
 
-    return NextResponse.json({
+    return jsonResponse({
       user: {
         id: currentUser.id,
         email: currentUser.email,
@@ -45,6 +56,10 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Get session error:", error);
-    return NextResponse.json({ user: null }, { status: 200 });
+    return jsonResponse({ user: null }, 200);
   }
+}
+
+export async function OPTIONS() {
+  return new NextResponse(null, { headers: CORS_HEADERS });
 }
