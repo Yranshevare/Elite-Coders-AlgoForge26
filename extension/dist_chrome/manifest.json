@@ -37,7 +37,7 @@
   "content_scripts": [
     {
       "js": [
-        "assets/index.prod.tsx-_jmS8G5m.js"
+        "assets/index.prod.tsx-CoS5h9mF.js"
       ],
       "matches": [
         "<all_urls>"
@@ -53,7 +53,7 @@
         "*.js",
         "*.css",
         "public/*",
-        "assets/index.prod.tsx-_jmS8G5m.js"
+        "assets/index.prod.tsx-CoS5h9mF.js"
       ],
       "use_dynamic_url": false
     }
