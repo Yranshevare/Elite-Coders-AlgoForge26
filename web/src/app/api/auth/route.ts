@@ -11,6 +11,17 @@ const JWT_SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET || "fallback_secret_change_me",
 );
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Allow-Credentials": "true",
+};
+
+function jsonResponse(body: unknown, status = 200) {
+  return NextResponse.json(body, { status, headers: CORS_HEADERS });
+}
+
 export type actionType = "send-otp" | "verify-otp";
 
 function hashOTP(otp: string) {
@@ -22,7 +33,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { action, email, otp } = body;
     if (!email) {
-      return NextResponse.json({ error: "Invalid email" }, { status: 400 });
+      return jsonResponse({ error: "Invalid email" }, 400);
     }
 
     if (action === "send-otp") {
@@ -50,10 +61,10 @@ export async function POST(request: Request) {
 
       const emailRes = await sendOTPEmail({ email, otp: code });
       if (!emailRes.success) {
-        return NextResponse.json({ error: emailRes.error }, { status: 500 });
+        return jsonResponse({ error: emailRes.error }, 500);
       }
 
-      return NextResponse.json({ success: true });
+      return jsonResponse({ success: true });
     }
 
     if (action === "verify-otp") {

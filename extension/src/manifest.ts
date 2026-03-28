@@ -30,6 +30,7 @@ export default defineManifest({
     128: 'icon128.png',
   },
   permissions: ['activeTab', 'storage', 'sidePanel', 'scripting'],
+  host_permissions: ['http://localhost:3000/*', 'https://your-production-domain.com/*'],
   content_scripts: [
     {
       js: isDev
