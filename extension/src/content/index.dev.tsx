@@ -1,64 +1,85 @@
-/**
- * Development entry point for content script.
- * Gmail email extractor - extracts complete sender, subject, and content
- */
-
+// Gmail email extractor and side panel trigger (Dev Version)
 (() => {
-  // Function to extract complete email details
   function extractEmailDetails() {
     try {
-      // Try to find the main email content container
-      // Gmail typically uses these selectors for email content
-      const emailSelectors = [
-        '[data-message-id] [role="presentation"]',
-        '.a3s.aiL',
-        '[role="main"] [role="article"]',
-        '[data-message-id]',
-        '.gs',
-        '[itemprop="description"]'
-      ];
-
-      let emailElement = null;
-      for (const selector of emailSelectors) {
-        emailElement = document.querySelector(selector);
-        if (emailElement && emailElement.textContent?.trim()) {
+      // 1. Get Subject
+      let subject = "";
+      const subjectSelectors = ['h2.hP', '[data-subject]', 'h1'];
+      for (const sel of subjectSelectors) {
+        const el = document.querySelector(sel);
+        if (el && el.textContent?.trim()) {
+          const text = el.textContent.trim();
+          if (text.toLowerCase().includes('search') && text.toLowerCase().includes('gemini')) continue;
+          subject = text;
           break;
         }
       }
 
-      // If no specific email element found, fall back to body
-      if (!emailElement) {
-        emailElement = document.body;
+      // 2. Get Sender Email
+      let senderEmail = "";
+      const senderSelectors = ['span[email]', '[data-hovercard-id]', '[data-email]', 'span.gD'];
+      for (const sel of senderSelectors) {
+        const el = document.querySelector(sel);
+        if (el) {
+          senderEmail = el.getAttribute('email') || el.getAttribute('data-hovercard-id') || el.getAttribute('data-email') || "";
+          if (senderEmail && senderEmail.includes('@')) break;
+          const match = (el.textContent || "").match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+          if (match) { senderEmail = match[0]; break; }
+        }
       }
 
-      // Clone the element to avoid modifying the original
+      // 3. Get Body & Links
+      const emailSelectors = ['[data-message-id] [role="presentation"]', '.a3s.aiL', '[role="main"] [role="article"]'];
+      let emailElement = null;
+      for (const selector of emailSelectors) {
+        emailElement = document.querySelector(selector);
+        if (emailElement && emailElement.textContent?.trim()) break;
+      }
+      if (!emailElement) emailElement = document.body;
+
       const clonedElement = emailElement.cloneNode(true) as Element;
+      clonedElement.querySelectorAll('style, script, link').forEach(el => el.remove());
 
-      // Remove all <style> tags
-      const styles = clonedElement.querySelectorAll('style');
-      styles.forEach(style => style.remove());
+      const body = clonedElement.textContent?.trim() || "";
+      const links: string[] = [];
+      clonedElement.querySelectorAll('a[href]').forEach((anchor) => {
+        const href = anchor.getAttribute('href');
+        if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+          links.push(href);
+        }
+      });
 
-      // Remove all <script> tags
-      const scripts = clonedElement.querySelectorAll('script');
-      scripts.forEach(script => script.remove());
-
-      // Remove all <link> tags with rel="stylesheet"
-      const links = clonedElement.querySelectorAll('link[rel="stylesheet"]');
-      links.forEach(link => link.remove());
-
-      // Get the clean HTML of the email element
-      const cleanHTML = clonedElement.outerHTML;
-
-      // Print the clean HTML
-      console.log('📧 Email HTML Element:', cleanHTML);
-      return cleanHTML;
+      return { senderEmail, subject, body, links };
     } catch (error) {
-      console.error('Error extracting HTML:', error);
+      console.error('Error extracting email:', error);
       return null;
     }
   }
 
-  // Listen for messages from the sidebar - ONLY extract when button is clicked
+  function requestOpenSidePanel() {
+    chrome.runtime.sendMessage({ action: 'openSidePanel' });
+  }
+
+  function attachClickListeners() {
+    const rows = document.querySelectorAll('.zA:not(.trustinbox-listener-attached)');
+    rows.forEach(row => {
+      row.classList.add('trustinbox-listener-attached');
+      row.addEventListener('click', () => {
+        setTimeout(requestOpenSidePanel, 500);
+      }, { capture: true });
+    });
+  }
+
+  function checkGmailAndInit() {
+    if (window.location.hostname.includes('mail.google.com')) {
+      attachClickListeners();
+    }
+  }
+
+  checkGmailAndInit();
+  const observer = new MutationObserver(() => checkGmailAndInit());
+  observer.observe(document.body, { childList: true, subtree: true });
+
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message.action === 'extractEmailDetails') {
       const result = extractEmailDetails();

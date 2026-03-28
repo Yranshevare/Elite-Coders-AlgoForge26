@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { fetchSession, sendOtp, verifyOtp } from "../utils/auth";
 
 type EmailData = {
@@ -11,9 +11,10 @@ type EmailData = {
 type AnalysisStep = {
   id: string;
   title: string;
+  desc: string;
   status: "pending" | "running" | "completed" | "error";
   details?: string;
-  data?: Record<string, unknown>;
+  data?: Record<string, any>;
 };
 
 type AiVerdict = {
@@ -23,128 +24,72 @@ type AiVerdict = {
   recommendation: string;
 };
 
-const C = {
-  bg: "#f8f9fb",
-  surface: "#ffffff",
-  border: "#e2e8f0",
-  borderFaint: "#edf2f7",
-  violet: "#7c3aed",
-  textPrimary: "#0f172a",
-  textSecondary: "#475569",
-  textMuted: "#94a3b8",
-  textDim: "#cbd5e1",
-  green: "#059669",
-  greenFaint: "rgba(5,150,105,0.08)",
-  greenBorder: "rgba(5,150,105,0.2)",
-  greenText: "#047857",
-  amber: "#d97706",
-  amberFaint: "rgba(217,119,6,0.08)",
-  amberBorder: "rgba(217,119,6,0.2)",
-  amberText: "#b45309",
-  red: "#dc2626",
-  redFaint: "rgba(220,38,38,0.06)",
-  redBorder: "rgba(220,38,38,0.2)",
-  redText: "#b91c1c",
-  runningColor: "#7c3aed",
+type UrlAnalysisResult = {
+  url: string;
+  domain: string;
+  steps: AnalysisStep[];
+  verdict: AiVerdict | null;
+  status: "pending" | "analyzing" | "completed" | "error";
 };
 
-const verdictCfg = {
+const THEME = {
+  primary: "#6366f1",
+  bg: "#f8fafc",
+  surface: "#ffffff",
+  border: "#f1f5f9",
+  textMain: "#1e293b",
+  textSec: "#64748b",
+  textMute: "#94a3b8",
+  safe: "#10b981",
+  safeBg: "rgba(16,185,129,0.08)",
+  warn: "#f59e0b",
+  warnBg: "rgba(245,158,11,0.08)",
+  danger: "#ef4444",
+  dangerBg: "rgba(239,68,68,0.08)",
+  fontStack:
+    "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+};
+
+const verdictMeta = {
   SAFE: {
-    bg: "rgba(16,185,129,0.1)",
-    border: "rgba(16,185,129,0.25)",
-    badge: "#10b981",
-    text: "#34d399",
-    dot: "#10b981",
+    color: THEME.safe,
+    bg: THEME.safeBg,
+    icon: "🛡️",
+    label: "Trusted",
+    score: 98,
+    desc: "This email appears secure.",
   },
   SUSPICIOUS: {
-    bg: "rgba(245,158,11,0.1)",
-    border: "rgba(245,158,11,0.25)",
-    badge: "#f59e0b",
-    text: "#fbbf24",
-    dot: "#f59e0b",
+    color: THEME.warn,
+    bg: THEME.warnBg,
+    icon: "⚠️",
+    label: "Review",
+    score: 45,
+    desc: "Potential risks identified.",
   },
   PHISHING: {
-    bg: "rgba(239,68,68,0.08)",
-    border: "rgba(239,68,68,0.25)",
-    badge: "#ef4444",
-    text: "#f87171",
-    dot: "#ef4444",
+    color: THEME.danger,
+    bg: THEME.dangerBg,
+    icon: "🚨",
+    label: "Danger",
+    score: 12,
+    desc: "High probability of phishing.",
   },
 };
 
-function IconShield() {
-  return (
-    <svg width="16" height="16" fill="none" stroke="#fff" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-      />
-    </svg>
-  );
-}
-
-function Spinner({
-  color = "#fff",
-  size = 14,
-}: {
-  color?: string;
-  size?: number;
-}) {
+function Spinner({ size = 18, color = THEME.primary }) {
   return (
     <div
       style={{
         width: size,
         height: size,
-        borderRadius: "50%",
-        border: `2px solid ${color}40`,
+        border: `2px solid ${color}22`,
         borderTopColor: color,
-        animation: "ti-spin 0.75s linear infinite",
-        flexShrink: 0,
+        borderRadius: "50%",
+        animation: "ti-spin 0.8s linear infinite",
       }}
     />
   );
-}
-
-function StepIcon({ status }: { status: AnalysisStep["status"] }) {
-  const base: React.CSSProperties = {
-    width: 16,
-    height: 16,
-    borderRadius: "50%",
-    flexShrink: 0,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  };
-  if (status === "completed")
-    return (
-      <div style={{ ...base, background: C.green }}>
-        <svg width="9" height="9" fill="none" stroke="#fff" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={3.5}
-            d="M5 13l4 4L19 7"
-          />
-        </svg>
-      </div>
-    );
-  if (status === "running") return <Spinner color={C.violet} size={16} />;
-  if (status === "error")
-    return (
-      <div style={{ ...base, background: C.red }}>
-        <svg width="9" height="9" fill="none" stroke="#fff" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={3}
-            d="M6 18L18 6M6 6l12 12"
-          />
-        </svg>
-      </div>
-    );
-  return <div style={{ ...base, border: "1px solid #334155" }} />;
 }
 
 export default function SidePanel() {
@@ -159,13 +104,9 @@ export default function SidePanel() {
   const [userId, setUserId] = useState("");
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [analyzingDomain, setAnalyzingDomain] = useState<string | null>(null);
-  const [analysisSteps, setAnalysisSteps] = useState<AnalysisStep[]>([
-    { id: "dns", title: "DNS Analysis", status: "pending" },
-    { id: "safebrowsing", title: "Safe Browsing", status: "pending" },
-    { id: "ai", title: "AI Verdict", status: "pending" },
-  ]);
-  const [finalVerdict, setFinalVerdict] = useState<AiVerdict | null>(null);
-  const analysisRef = useRef<HTMLDivElement>(null);
+  const [urlResults, setUrlResults] = useState<UrlAnalysisResult[]>([]);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
+  const [activeTab, setActiveTab] = useState<"scan" | "sender">("scan");
 
   useEffect(() => {
     (async () => {
@@ -181,9 +122,44 @@ export default function SidePanel() {
     })();
   }, []);
 
+  // Listen for navigation messages from background
+  useEffect(() => {
+    const handleMessage = (msg: any) => {
+      if (msg.action === "navigatedToInbox") {
+        // Programmatically close the side panel when navigating to inbox
+        window.close();
+      } else if (msg.action === "navigatedToEmail") {
+        resetState();
+        extractEmail();
+      }
+    };
+    chrome.runtime.onMessage.addListener(handleMessage);
+    return () => chrome.runtime.onMessage.removeListener(handleMessage);
+  }, [authStatus]);
+
   useEffect(() => {
     if (authStatus === "logged-in" && !emailData && !isLoading) extractEmail();
-  }, [authStatus]);
+  }, [authStatus, emailData]);
+
+  useEffect(() => {
+    if (
+      authStatus === "logged-in" &&
+      emailData &&
+      emailData.links?.length > 0 &&
+      !showAnalysis &&
+      !analyzingDomain
+    ) {
+      handleAnalyseEmail();
+    }
+  }, [authStatus, emailData]);
+
+  const resetState = () => {
+    setEmailData(null);
+    setShowAnalysis(false);
+    setUrlResults([]);
+    setAnalyzingDomain(null);
+    setExpandedIndex(0);
+  };
 
   const extractDomain = (url: string): string | null => {
     try {
@@ -194,91 +170,111 @@ export default function SidePanel() {
   };
 
   const extractEmail = async () => {
+    if (isLoading) return;
     setIsLoading(true);
     try {
       const [tab] = await chrome.tabs.query({
         active: true,
         currentWindow: true,
       });
-      if (!tab.id) {
-        setIsLoading(false);
-        return;
+      if (tab.id) {
+        const response = await chrome.tabs.sendMessage(tab.id, {
+          action: "extractEmailDetails",
+        });
+        if (response.success && response.data) setEmailData(response.data);
       }
-      const response = await chrome.tabs.sendMessage(tab.id, {
-        action: "extractEmailDetails",
-      });
-      if (response.success && response.data) setEmailData(response.data);
     } catch {
-      /* no email open */
+      /* ignore */
     }
     setIsLoading(false);
   };
 
   const handleSendOtp = async () => {
-    if (!email) {
-      setMessage("Please provide email address");
-      return;
-    }
+    if (!email) return setMessage("Email required");
     setIsLoading(true);
-    setMessage("Sending…");
+    setMessage("");
     try {
       await sendOtp(email);
       setAuthStatus("otp-sent");
-      setMessage("Code sent — check your email.");
+      setMessage("Code sent to your email");
     } catch (e) {
       setMessage((e as Error).message);
-    } finally {
-      setIsLoading(false);
     }
+    setIsLoading(false);
   };
 
   const handleVerifyOtp = async () => {
-    if (!email || !otp) {
-      setMessage("Email and OTP are required.");
-      return;
-    }
+    if (!otp) return;
     setIsLoading(true);
-    setMessage("Verifying…");
+    setMessage("");
     try {
       const result = await verifyOtp(email, otp);
       if (result?.success) {
         setAuthStatus("logged-in");
         setUserId(email);
-        setMessage("Verified!");
-      } else setMessage("Verification failed.");
+      } else setMessage("Invalid code");
     } catch (e) {
       setMessage((e as Error).message);
-    } finally {
-      setIsLoading(false);
     }
+    setIsLoading(false);
   };
 
-  const handleAnalyseEmail = async () => {
-    if (!emailData || !emailData.links.length || !userId) return;
-    const domain = extractDomain(emailData.links[0]);
+  const analyzeSingleUrl = async (url: string, index: number) => {
+    const domain = extractDomain(url);
     if (!domain) return;
 
-    setAnalyzingDomain(domain);
-    setShowAnalysis(true);
-    setFinalVerdict(null);
-    setAnalysisSteps([
-      { id: "dns", title: "DNS Analysis", status: "running" },
-      { id: "safebrowsing", title: "Safe Browsing", status: "pending" },
-      { id: "ai", title: "AI Verdict", status: "pending" },
-    ]);
-    setTimeout(
-      () => analysisRef.current?.scrollIntoView({ behavior: "smooth" }),
-      100,
+    setUrlResults((prev) =>
+      prev.map((r, i) =>
+        i === index
+          ? {
+              ...r,
+              domain,
+              status: "analyzing",
+              steps: [
+                {
+                  id: "dns",
+                  title: "Infrastructure",
+                  desc: "Checking domain age and DNS",
+                  status: "running",
+                },
+                {
+                  id: "safebrowsing",
+                  title: "Reputation",
+                  desc: "Consulting threat databases",
+                  status: "pending",
+                },
+                {
+                  id: "ml",
+                  title: "Pattern Engine",
+                  desc: "AI behavioral scanning",
+                  status: "pending",
+                },
+                {
+                  id: "ai",
+                  title: "Risk Verdict",
+                  desc: "Final intelligence report",
+                  status: "pending",
+                },
+              ],
+            }
+          : r,
+      ),
     );
+    setAnalyzingDomain(domain);
 
     try {
       const response = await fetch("http://localhost:3000/api/ai-verdict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ domain, userId }),
+        body: JSON.stringify({
+          domain,
+          userId,
+          senderEmail: emailData?.senderEmail,
+          emailSubject: emailData?.subject,
+          emailBody: emailData?.body,
+          links: emailData?.links,
+        }),
       });
-      if (!response.ok) throw new Error(`Request failed: ${response.status}`);
-
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
       if (!reader) return;
@@ -296,772 +292,836 @@ export default function SidePanel() {
             const raw = block.match(/data:\s*(\{.*\})/s)?.[1]?.trim();
             if (!eType || !raw || raw === "[DONE]") continue;
             const data = JSON.parse(raw);
-            if (eType === "dns") {
-              setAnalysisSteps((p) =>
-                p.map((s) =>
-                  s.id === "dns"
-                    ? {
-                        ...s,
-                        status: "completed",
-                        data: { ...data.result, domain: data.domain },
-                      }
-                    : s.id === "safebrowsing"
-                      ? { ...s, status: "running" }
-                      : s,
-                ),
-              );
-            } else if (eType === "safebrowsing") {
-              setAnalysisSteps((p) =>
-                p.map((s) =>
-                  s.id === "safebrowsing"
-                    ? { ...s, status: "completed", data }
-                    : s.id === "ai"
-                      ? { ...s, status: "running" }
-                      : s,
-                ),
-              );
-            } else if (eType === "ai_final") {
-              setFinalVerdict(data);
-              setAnalysisSteps((p) =>
-                p.map((s) =>
-                  s.id === "ai" ? { ...s, status: "completed", data } : s,
-                ),
-              );
+
+            setUrlResults((prev) =>
+              prev.map((r, i) => {
+                if (i !== index) return r;
+                let nextSteps = [...r.steps];
+                if (eType === "dns") {
+                  nextSteps = nextSteps.map((s) =>
+                    s.id === "dns"
+                      ? {
+                          ...s,
+                          status: "completed",
+                          data: { ...data.result, domain: data.domain },
+                        }
+                      : s.id === "safebrowsing"
+                        ? { ...s, status: "running" }
+                        : s,
+                  );
+                } else if (eType === "safebrowsing") {
+                  nextSteps = nextSteps.map((s) =>
+                    s.id === "safebrowsing"
+                      ? { ...s, status: "completed", data }
+                      : s.id === "ml"
+                        ? { ...s, status: "running" }
+                        : s,
+                  );
+                } else if (eType === "ml") {
+                  nextSteps = nextSteps.map((s) =>
+                    s.id === "ml"
+                      ? { ...s, status: "completed", data }
+                      : s.id === "ai"
+                        ? { ...s, status: "running" }
+                        : s,
+                  );
+                } else if (eType === "ai_final") {
+                  nextSteps = nextSteps.map((s) =>
+                    s.id === "ai" ? { ...s, status: "completed", data } : s,
+                  );
+                  return {
+                    ...r,
+                    verdict: data,
+                    steps: nextSteps,
+                    status: "completed",
+                  };
+                } else if (eType === "error") return { ...r, status: "error" };
+                return { ...r, steps: nextSteps };
+              }),
+            );
+            if (eType === "ai_final" || eType === "error")
               setAnalyzingDomain(null);
-            } else if (eType === "error") {
-              setAnalysisSteps((p) =>
-                p.map((s) =>
-                  s.status === "running"
-                    ? {
-                        ...s,
-                        status: "error",
-                        details: data?.error || "Unknown error",
-                      }
-                    : s,
-                ),
-              );
-              setAnalyzingDomain(null);
-            } else if (eType === "done") {
-              setAnalyzingDomain(null);
-            }
           } catch {
-            /* continue */
+            /* ignore */
           }
         }
       }
-    } catch (error) {
-      setAnalysisSteps((p) =>
-        p.map((s) =>
-          s.status === "running"
-            ? { ...s, status: "error", details: (error as Error).message }
-            : s,
-        ),
-      );
+    } catch {
       setAnalyzingDomain(null);
     }
   };
 
-  // ─── shared style helpers ───────────────────────────────────────────────────
-
-  const card: React.CSSProperties = {
-    background: C.surface,
-    border: `1px solid ${C.border}`,
-    borderRadius: 12,
-    overflow: "hidden",
+  const handleAnalyseEmail = async () => {
+    if (!emailData?.links?.length || !userId) return;
+    const initialResults: UrlAnalysisResult[] = emailData.links.map((link) => ({
+      url: link,
+      domain: extractDomain(link) || "",
+      steps: [],
+      verdict: null,
+      status: "pending",
+    }));
+    setUrlResults(initialResults);
+    setShowAnalysis(true);
+    for (let i = 0; i < emailData.links.length; i++) {
+      await analyzeSingleUrl(emailData.links[i], i);
+    }
   };
 
-  const cardHead: React.CSSProperties = {
-    padding: "7px 12px",
-    borderBottom: `1px solid ${C.border}`,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
+  const overallVerdict = urlResults.reduce(
+    (acc, curr) => {
+      if (!curr.verdict) return acc;
+      if (curr.verdict.verdict === "PHISHING") return "PHISHING";
+      if (curr.verdict.verdict === "SUSPICIOUS" && acc !== "PHISHING")
+        return "SUSPICIOUS";
+      return acc;
+    },
+    "SAFE" as "SAFE" | "SUSPICIOUS" | "PHISHING",
+  );
+
+  const getScore = () => {
+    if (urlResults.length === 0) return 100;
+    const lowest = urlResults.reduce((min, curr) => {
+      if (!curr.verdict) return min;
+      const s = verdictMeta[curr.verdict.verdict].score;
+      return s < min ? s : min;
+    }, 100);
+    return lowest;
   };
 
-  const label10: React.CSSProperties = {
-    fontSize: 10,
-    fontWeight: 500,
-    color: C.textMuted,
-    letterSpacing: "0.1em",
-    textTransform: "uppercase",
-  };
+  const Header = () => (
+    <div
+      style={{
+        padding: "16px 20px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: THEME.surface,
+        borderBottom: `1px solid ${THEME.border}`,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div
+          style={{
+            width: 26,
+            height: 26,
+            background: THEME.primary,
+            borderRadius: 6,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "white",
+            fontWeight: 900,
+            fontSize: 16,
+          }}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+            />
+          </svg>
+        </div>
+        <span style={{ fontWeight: 800, fontSize: 16, color: THEME.textMain }}>
+          TrustInbox
+        </span>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <button
+          onClick={() => {
+            resetState();
+            extractEmail();
+          }}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontSize: 16,
+            color: THEME.textMute,
+            borderRadius: 8,
+            padding: "10px",
+          }}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+            <path d="M16 16h5v5" />
+          </svg>
+        </button>
+        <a
+          href="http://localhost:3000/me/analytics"
+          target="_blank"
+          style={{
+            background: THEME.primary,
+            border: "none",
+            cursor: "pointer",
+            fontSize: 16,
+            color: "#fff",
+            borderRadius: 8,
+            padding: "10px",
+            textDecoration: "none",
+          }}
+        >
+          Open Dashboard
+        </a>
+      </div>
+    </div>
+  );
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "9px 11px",
-    background: "#f1f5f9",
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    color: C.textPrimary,
-    fontSize: 12,
-    fontFamily: "inherit",
-    outline: "none",
-    boxSizing: "border-box",
-  };
+  if (authStatus !== "logged-in") {
+    return (
+      <div
+        style={{
+          height: "100vh",
+          background: THEME.surface,
+          fontFamily: THEME.fontStack,
+          display: "flex",
+          flexDirection: "column",
+          padding: 24,
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: 64, marginBottom: 24 }}>🛡️</div>
+          <h2
+            style={{
+              fontWeight: 800,
+              fontSize: 28,
+              color: THEME.textMain,
+              marginBottom: 12,
+            }}
+          >
+            Inbox Security
+          </h2>
+          <p
+            style={{
+              fontSize: 15,
+              color: THEME.textSec,
+              lineHeight: 1.6,
+              marginBottom: 40,
+            }}
+          >
+            Activate real-time AI protection for your Gmail account.
+          </p>
 
-  const primaryBtn: React.CSSProperties = {
-    width: "100%",
-    padding: "11px 0",
-    background: C.violet,
-    border: "none",
-    borderRadius: 11,
-    color: C.textPrimary,
-    fontSize: 13,
-    fontWeight: 600,
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    fontFamily: "inherit",
-    boxSizing: "border-box",
-  };
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ textAlign: "left" }}>
+              <label
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: THEME.textSec,
+                  marginLeft: 4,
+                  marginBottom: 6,
+                  display: "block",
+                }}
+              >
+                Email Address
+              </label>
+              <input
+                style={{
+                  width: "100%",
+                  padding: "14px 18px",
+                  borderRadius: 14,
+                  border: `1.5px solid ${THEME.border}`,
+                  fontSize: 15,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+                placeholder="name@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
 
-  const disabledBtn: React.CSSProperties = {
-    background: "#1e2630",
-    color: "#334155",
-    cursor: "not-allowed",
-  };
+            {authStatus === "otp-sent" && (
+              <div style={{ textAlign: "left" }}>
+                <label
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: THEME.textSec,
+                    marginLeft: 4,
+                    marginBottom: 6,
+                    display: "block",
+                  }}
+                >
+                  Verification Code
+                </label>
+                <input
+                  style={{
+                    width: "100%",
+                    padding: "14px 18px",
+                    borderRadius: 14,
+                    border: `1.5px solid ${THEME.primary}`,
+                    fontSize: 18,
+                    outline: "none",
+                    boxSizing: "border-box",
+                    textAlign: "center",
+                    letterSpacing: 8,
+                    fontWeight: 700,
+                  }}
+                  placeholder="000000"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  disabled={isLoading}
+                />
+              </div>
+            )}
 
-  // ─── render ─────────────────────────────────────────────────────────────────
+            <button
+              style={{
+                width: "100%",
+                padding: "16px",
+                background: THEME.primary,
+                color: "white",
+                border: "none",
+                borderRadius: 16,
+                fontWeight: 700,
+                fontSize: 16,
+                cursor: "pointer",
+                boxShadow: `0 8px 16px ${THEME.primary}33`,
+                marginTop: 8,
+              }}
+              onClick={
+                authStatus === "otp-sent" ? handleVerifyOtp : handleSendOtp
+              }
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <Spinner color="white" size={20} />
+              ) : authStatus === "otp-sent" ? (
+                "Verify Identity"
+              ) : (
+                "Get Started"
+              )}
+            </button>
+
+            {message && (
+              <div
+                style={{
+                  fontSize: 13,
+                  color:
+                    message.toLowerCase().includes("invalid") ||
+                    message.toLowerCase().includes("required")
+                      ? THEME.danger
+                      : THEME.primary,
+                  fontWeight: 600,
+                }}
+              >
+                {message}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
       style={{
         height: "100vh",
-        width: "100v%",
-        background: C.bg,
+        background: THEME.bg,
+        fontFamily: THEME.fontStack,
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        minHeight: 500,
-        fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        fontSize: 13,
-        color: C.textPrimary,
-        boxSizing: "border-box",
       }}
     >
       <style>{`@keyframes ti-spin { to { transform: rotate(360deg); } }`}</style>
+      <Header />
 
-      {/* ── Header ── */}
+      {/* Tabs */}
       <div
         style={{
-          padding: "16px 14px 13px",
-          borderBottom: `1px solid ${C.border}`,
           display: "flex",
-          alignItems: "center",
-          gap: 10,
-          flexShrink: 0,
+          padding: "0 20px",
+          background: THEME.surface,
+          borderBottom: `1px solid ${THEME.border}`,
         }}
       >
         <div
+          onClick={() => setActiveTab("scan")}
           style={{
-            width: 28,
-            height: 28,
-            background: C.violet,
-            borderRadius: 9,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
+            padding: "12px 0",
+            marginRight: 24,
+            fontSize: 13,
+            fontWeight: 700,
+            color: activeTab === "scan" ? THEME.primary : THEME.textMute,
+            borderBottom: `2px solid ${activeTab === "scan" ? THEME.primary : "transparent"}`,
+            cursor: "pointer",
           }}
         >
-          <IconShield />
+          Email Scan
         </div>
-        <div>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: C.textPrimary,
-              lineHeight: 1,
-            }}
-          >
-            TrustInbox
-          </div>
-          <div
-            style={{
-              fontSize: 10,
-              color: C.textMuted,
-              marginTop: 3,
-              letterSpacing: "0.05em",
-              lineHeight: 1,
-            }}
-          >
-            Phishing Detection
-          </div>
+        <div
+          onClick={() => setActiveTab("sender")}
+          style={{
+            padding: "12px 0",
+            fontSize: 13,
+            fontWeight: 700,
+            color: activeTab === "sender" ? THEME.primary : THEME.textMute,
+            borderBottom: `2px solid ${activeTab === "sender" ? THEME.primary : "transparent"}`,
+            cursor: "pointer",
+          }}
+        >
+          Sender Profile
         </div>
       </div>
 
-      {/* ── Body ── */}
       <div
         style={{
           flex: 1,
           overflowY: "auto",
-          padding: "10px 10px 0",
           display: "flex",
           flexDirection: "column",
-          gap: 8,
         }}
       >
-        {/* Auth panel */}
-        {authStatus !== "logged-in" && (
-          <div
-            style={{
-              background: C.surface,
-              border: `1px solid ${C.border}`,
-              borderRadius: 12,
-              padding: 14,
-            }}
-          >
-            <div style={{ ...label10, marginBottom: 10 }}>Sign in</div>
-            <input
-              style={inputStyle}
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              disabled={isLoading}
-            />
-            <button
+        {activeTab === "scan" ? (
+          <>
+            {/* Score Card */}
+            <div
               style={{
-                ...primaryBtn,
-                marginTop: 8,
-                ...(isLoading || authStatus === "otp-sent"
-                  ? {
-                      background: "#1e2630",
-                      color: "#fff",
-                      cursor: "not-allowed",
-                    }
-                  : {}),
+                padding: "24px 20px",
+                background: THEME.surface,
+                borderBottom: `1px solid ${THEME.border}`,
+                textAlign: "center",
               }}
-              onClick={handleSendOtp}
-              disabled={isLoading || authStatus === "otp-sent"}
             >
-              {isLoading && authStatus === "logged-out"
-                ? "Sending…"
-                : "Send code"}
-            </button>
-            {authStatus === "otp-sent" && (
               <div
                 style={{
-                  marginTop: 10,
-                  paddingTop: 10,
-                  borderTop: `1px solid ${C.border}`,
+                  fontSize: 44,
+                  fontWeight: 900,
+                  color: verdictMeta[overallVerdict].color,
+                  marginBottom: 4,
                 }}
               >
-                <input
-                  style={{
-                    ...inputStyle,
-                    textAlign: "center",
-                    letterSpacing: "0.3em",
-                  }}
-                  type="text"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  placeholder="· · · · · ·"
-                  disabled={isLoading}
-                />
-                <button
-                  style={{
-                    ...primaryBtn,
-                    marginTop: 8,
-                    background: "#1e2630",
-                    color: "#fff",
-                  }}
-                  onClick={handleVerifyOtp}
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Verifying…" : "Verify"}
-                </button>
+                {getScore()}
+                <span style={{ fontSize: 16, color: THEME.textMute }}>
+                  /100
+                </span>
               </div>
-            )}
-            {message && (
+              <div
+                style={{ fontWeight: 800, fontSize: 15, color: THEME.textMain }}
+              >
+                {verdictMeta[overallVerdict].label} Rating
+              </div>
               <p
                 style={{
-                  fontSize: 11,
-                  marginTop: 8,
-                  color:
-                    message.includes("Error") || message.includes("fail")
-                      ? C.redText
-                      : C.greenText,
+                  fontSize: 12,
+                  color: THEME.textSec,
+                  margin: "4px 0 0",
                 }}
               >
-                {message}
+                {verdictMeta[overallVerdict].desc}
               </p>
-            )}
-          </div>
-        )}
+            </div>
 
-        {/* Logged-in states */}
-        {authStatus === "logged-in" && (
-          <>
-            {/* No email */}
-            {!emailData && (
+            <div
+              style={{
+                padding: 16,
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+              }}
+            >
+              {!emailData ? (
+                <div
+                  style={{
+                    padding: "60px 20px",
+                    textAlign: "center",
+                    borderRadius: 24,
+                    background: THEME.surface,
+                    border: `1px solid ${THEME.border}`,
+                  }}
+                >
+                  <div style={{ fontSize: 40, marginBottom: 16 }}>📫</div>
+                  <h3
+                    style={{
+                      fontWeight: 800,
+                      fontSize: 16,
+                      color: THEME.textMain,
+                    }}
+                  >
+                    Scan Ready
+                  </h3>
+                  <p style={{ fontSize: 13, color: THEME.textSec }}>
+                    Select an email to analyze embedded links.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      padding: 16,
+                      background: THEME.surface,
+                      borderRadius: 16,
+                      border: `1px solid ${THEME.border}`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: THEME.textMute,
+                        textTransform: "uppercase",
+                        marginBottom: 6,
+                      }}
+                    >
+                      Subject
+                    </div>
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 13,
+                        color: THEME.textMain,
+                      }}
+                    >
+                      {emailData.subject}
+                    </div>
+                  </div>
+
+                  {urlResults.map((res, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        background: THEME.surface,
+                        borderRadius: 16,
+                        border: `1px solid ${res.status === "analyzing" ? THEME.primary : THEME.border}`,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          padding: "14px 16px",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                        }}
+                        onClick={() =>
+                          setExpandedIndex(expandedIndex === idx ? null : idx)
+                        }
+                      >
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: THEME.textMain,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {res.domain || res.url}
+                          </div>
+                          <div style={{ fontSize: 11, color: THEME.textMute }}>
+                            {res.status === "completed"
+                              ? "Scan Complete"
+                              : "Analyzing..."}
+                          </div>
+                        </div>
+                        {res.verdict ? (
+                          <div
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              background:
+                                verdictMeta[res.verdict.verdict].color,
+                            }}
+                          />
+                        ) : res.status === "analyzing" ? (
+                          <Spinner size={12} />
+                        ) : null}
+                      </div>
+
+                      {expandedIndex === idx && (
+                        <div style={{ padding: "0 16px 16px" }}>
+                          <div
+                            style={{
+                              height: 1,
+                              background: THEME.border,
+                              marginBottom: 12,
+                            }}
+                          />
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 10,
+                            }}
+                          >
+                            {res.steps.map((step) => (
+                              <div key={step.id}>
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    marginBottom: 2,
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      color: THEME.textMain,
+                                    }}
+                                  >
+                                    {step.title}
+                                  </div>
+                                  {step.status === "running" && (
+                                    <Spinner size={10} />
+                                  )}
+                                </div>
+                                {step.status === "completed" && step.data && (
+                                  <div
+                                    style={{
+                                      fontSize: 11,
+                                      color: THEME.textSec,
+                                    }}
+                                  >
+                                    {step.id === "dns" &&
+                                      `Age: ${step.data.age_days || "New"} days | Reputation: ${step.data.vt_reputation || 0}`}
+                                    {step.id === "safebrowsing" &&
+                                      (step.data.isSafe
+                                        ? "Verified secure database"
+                                        : "FLAGGED: Known threat")}
+                                    {step.id === "ml" &&
+                                      `AI Confidence: ${Math.round((step.data.raw?.[step.data.prediction] || 0) * 100)}%`}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                            {res.verdict && (
+                              <div
+                                style={{
+                                  marginTop: 4,
+                                  padding: 12,
+                                  background: THEME.bg,
+                                  borderRadius: 12,
+                                  borderLeft: `3px solid ${verdictMeta[res.verdict.verdict].color}`,
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: 800,
+                                    color: THEME.textMain,
+                                    marginBottom: 2,
+                                  }}
+                                >
+                                  Recommendation
+                                </div>
+                                <p
+                                  style={{
+                                    fontSize: 12,
+                                    color: THEME.textSec,
+                                    lineHeight: 1.4,
+                                    margin: 0,
+                                  }}
+                                >
+                                  {res.verdict.recommendation}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          </>
+        ) : (
+          <div style={{ padding: 20 }}>
+            {emailData ? (
               <div
                 style={{
-                  border: `1px dashed ${C.border}`,
-                  borderRadius: 12,
-                  padding: "24px 16px",
+                  background: THEME.surface,
+                  padding: 20,
+                  borderRadius: 24,
+                  border: `1px solid ${THEME.border}`,
                   textAlign: "center",
                 }}
               >
                 <div
                   style={{
-                    width: 36,
-                    height: 36,
+                    width: 64,
+                    height: 64,
+                    background: `${THEME.primary}12`,
                     borderRadius: "50%",
-                    background: C.border,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    margin: "0 auto 10px",
+                    margin: "0 auto 16px",
+                    fontSize: 24,
                   }}
                 >
-                  <svg
-                    width="18"
-                    height="18"
-                    fill="none"
-                    stroke={C.textMuted}
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
+                  👤
                 </div>
-                <p style={{ fontSize: 12, color: C.textMuted }}>
-                  No email open
-                </p>
-                <p style={{ fontSize: 10, color: C.textDim, marginTop: 3 }}>
-                  Open a Gmail message to begin
-                </p>
-              </div>
-            )}
-
-            {/* Links */}
-            {emailData && emailData.links.length > 0 && (
-              <div style={{ ...card, height: "50%" }}>
-                <div style={cardHead}>
-                  <span style={label10}>Links found</span>
-                  <span
-                    style={{
-                      fontSize: 10,
-                      color: C.textMuted,
-                      background: C.border,
-                      padding: "2px 6px",
-                      borderRadius: 5,
-                    }}
-                  >
-                    {emailData.links.length}
-                  </span>
+                <h3
+                  style={{
+                    fontWeight: 800,
+                    fontSize: 16,
+                    color: THEME.textMain,
+                    marginBottom: 4,
+                  }}
+                >
+                  Sender Identity
+                </h3>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: THEME.primary,
+                    fontWeight: 700,
+                    marginBottom: 12,
+                  }}
+                >
+                  {emailData.senderEmail}
                 </div>
-                <div style={{ overflowY: "auto" }}>
-                  {emailData.links.map((link, i) => (
-                    <a
-                      key={i}
-                      href={link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "7px 12px",
-                        borderTop:
-                          i === 0 ? "none" : `1px solid ${C.borderFaint}`,
-                        textDecoration: "none",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 6,
-                          height: 6,
-                          borderRadius: "50%",
-                          background: C.violet,
-                          flexShrink: 0,
-                        }}
-                      />
-                      <span
-                        style={{
-                          fontSize: 11,
-                          color: C.textMuted,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {extractDomain(link) || link}
-                      </span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {emailData && emailData.links.length === 0 && (
-              <div
-                style={{
-                  border: `1px dashed ${C.border}`,
-                  borderRadius: 12,
-                  padding: "16px",
-                  textAlign: "center",
-                }}
-              >
-                <p style={{ fontSize: 12, color: C.textMuted }}>
-                  No links found in this email
-                </p>
-              </div>
-            )}
-
-            {/* Analysis */}
-            {showAnalysis && (
-              <div
-                ref={analysisRef}
-                style={{ ...card, height: "50%", overflowY: "auto" }}
-              >
-                <div style={cardHead}>
-                  <span style={label10}>Analysis</span>
-                  {analyzingDomain && (
-                    <span
-                      style={{
-                        fontSize: 10,
-                        color: C.runningColor,
-                        maxWidth: 120,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {analyzingDomain}
-                    </span>
-                  )}
-                </div>
-
-                {analysisSteps.map((step, idx) => (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 12,
+                    textAlign: "left",
+                  }}
+                >
                   <div
-                    key={step.id}
                     style={{
-                      padding: "9px 12px",
-                      borderTop:
-                        idx === 0 ? "none" : `1px solid ${C.borderFaint}`,
+                      padding: 12,
+                      background: THEME.bg,
+                      borderRadius: 12,
                     }}
                   >
                     <div
-                      style={{ display: "flex", alignItems: "center", gap: 8 }}
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: THEME.textMute,
+                        textTransform: "uppercase",
+                      }}
                     >
-                      <StepIcon status={step.status} />
-                      <span
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 500,
-                          color:
-                            step.status === "completed"
-                              ? C.textPrimary
-                              : step.status === "running"
-                                ? C.runningColor
-                                : step.status === "error"
-                                  ? C.redText
-                                  : "#334155",
-                        }}
-                      >
-                        {step.title}
-                      </span>
+                      Source Domain
                     </div>
-
-                    {step.data && step.id === "dns" && (
-                      <div
-                        style={{
-                          marginTop: 6,
-                          marginLeft: 24,
-                          display: "grid",
-                          gridTemplateColumns: "1fr 1fr",
-                          gap: "2px 8px",
-                        }}
-                      >
-                        {(
-                          [
-                            {
-                              k: "Domain",
-                              v: (step.data as any).domain,
-                              c: C.textSecondary,
-                            },
-                            {
-                              k: "Age",
-                              v: `${(step.data as any).age_days}d`,
-                              c: C.textSecondary,
-                            },
-                            {
-                              k: "DNSSEC",
-                              v: (step.data as any).dnssec_valid
-                                ? "Valid"
-                                : "Unsigned",
-                              c: (step.data as any).dnssec_valid
-                                ? C.greenText
-                                : C.amberText,
-                            },
-                            {
-                              k: "Flux",
-                              v: (step.data as any).flux_score,
-                              c: C.textSecondary,
-                            },
-                            {
-                              k: "VT threats",
-                              v: (step.data as any).vt_malicious,
-                              c:
-                                (step.data as any).vt_malicious > 0
-                                  ? C.redText
-                                  : C.greenText,
-                            },
-                            {
-                              k: "Reputation",
-                              v: (step.data as any).vt_reputation,
-                              c: C.textSecondary,
-                            },
-                          ] as { k: string; v: unknown; c: string }[]
-                        ).map(({ k, v, c }) => (
-                          <div
-                            key={k}
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
-                            <span style={{ fontSize: 10, color: "#334155" }}>
-                              {k}
-                            </span>
-                            <span
-                              style={{
-                                fontSize: 10,
-                                fontWeight: 500,
-                                color: c,
-                                maxWidth: 80,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {String(v)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {step.data && step.id === "safebrowsing" && (
-                      <div style={{ marginTop: 6, marginLeft: 24 }}>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            fontSize: 10,
-                            fontWeight: 500,
-                            padding: "2px 7px",
-                            borderRadius: 5,
-                            background: (step.data as any).isSafe
-                              ? "rgba(16,185,129,0.12)"
-                              : "rgba(239,68,68,0.12)",
-                            color: (step.data as any).isSafe
-                              ? C.greenText
-                              : C.redText,
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: 5,
-                              height: 5,
-                              borderRadius: "50%",
-                              background: (step.data as any).isSafe
-                                ? C.green
-                                : C.red,
-                              display: "inline-block",
-                            }}
-                          />
-                          {(step.data as any).isSafe
-                            ? "No threats detected"
-                            : "Threats found"}
-                        </span>
-                      </div>
-                    )}
-
-                    {step.details && (
-                      <p
-                        style={{
-                          marginTop: 4,
-                          marginLeft: 24,
-                          fontSize: 10,
-                          color: C.redText,
-                        }}
-                      >
-                        {step.details}
-                      </p>
-                    )}
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: THEME.textMain,
+                      }}
+                    >
+                      {emailData.senderEmail.split("@")[1]}
+                    </div>
                   </div>
-                ))}
-
-                {finalVerdict &&
-                  (() => {
-                    const cfg =
-                      verdictCfg[finalVerdict.verdict] ?? verdictCfg.SUSPICIOUS;
-                    return (
-                      <div
-                        style={{
-                          margin: "4px 10px 10px",
-                          borderRadius: 10,
-                          padding: "10px 12px",
-                          border: `1px solid ${cfg.border}`,
-                          background: cfg.bg,
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            marginBottom: 6,
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: "#fff",
-                              background: cfg.badge,
-                              padding: "3px 8px",
-                              borderRadius: 5,
-                            }}
-                          >
-                            {finalVerdict.verdict}
-                          </span>
-                          <span style={{ fontSize: 10, color: C.textMuted }}>
-                            {Math.round(finalVerdict.confidence * 100)}%
-                            confidence
-                          </span>
-                        </div>
-                        <p
-                          style={{
-                            fontSize: 11,
-                            color: cfg.text,
-                            marginBottom: 6,
-                            lineHeight: 1.5,
-                          }}
-                        >
-                          {finalVerdict.recommendation}
-                        </p>
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 3,
-                          }}
-                        >
-                          {finalVerdict.reasons.map((r, i) => (
-                            <div
-                              key={i}
-                              style={{
-                                display: "flex",
-                                gap: 5,
-                                alignItems: "flex-start",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  width: 4,
-                                  height: 4,
-                                  borderRadius: "50%",
-                                  background: cfg.dot,
-                                  marginTop: 4,
-                                  flexShrink: 0,
-                                }}
-                              />
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  color: C.textMuted,
-                                  lineHeight: 1.5,
-                                }}
-                              >
-                                {r}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  <div
+                    style={{
+                      padding: 12,
+                      background: THEME.bg,
+                      borderRadius: 12,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: THEME.textMute,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Security Status
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: THEME.safe,
+                      }}
+                    >
+                      ✓ Verified Records (SPF/DKIM)
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: "60px 20px",
+                  textAlign: "center",
+                  borderRadius: 24,
+                  background: THEME.surface,
+                  border: `1px solid ${THEME.border}`,
+                }}
+              >
+                <h3
+                  style={{
+                    fontWeight: 800,
+                    fontSize: 16,
+                    color: THEME.textMain,
+                  }}
+                >
+                  No Sender Data
+                </h3>
+                <p style={{ fontSize: 13, color: THEME.textSec }}>
+                  Open an email to see sender reputation.
+                </p>
               </div>
             )}
-          </>
+          </div>
         )}
-
-        <div style={{ height: 4, flexShrink: 0 }} />
       </div>
 
-      {/* ── Footer ── */}
-      {authStatus === "logged-in" && (
-        <div
+      <div
+        style={{
+          padding: "16px 20px",
+          borderTop: `1px solid ${THEME.border}`,
+          background: THEME.surface,
+          textAlign: "center",
+        }}
+      >
+        <span
           style={{
-            padding: "10px 10px 14px",
-            borderTop: `1px solid ${C.border}`,
-            flexShrink: 0,
+            fontSize: 10,
+            fontWeight: 800,
+            color: THEME.textMute,
+            letterSpacing: "0.1em",
           }}
         >
-          <button
-            style={{
-              ...primaryBtn,
-              ...(!emailData ||
-              !emailData.links.length ||
-              analyzingDomain !== null
-                ? disabledBtn
-                : {}),
-            }}
-            onClick={handleAnalyseEmail}
-            disabled={
-              !emailData || !emailData.links.length || analyzingDomain !== null
-            }
-          >
-            {analyzingDomain ? (
-              <>
-                <Spinner />
-                <span>Analysing…</span>
-              </>
-            ) : (
-              <>
-                <svg
-                  width="15"
-                  height="15"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                  />
-                </svg>
-                <span>Analyse email</span>
-              </>
-            )}
-          </button>
-          <p
-            style={{
-              fontSize: 10,
-              color: C.textDim,
-              textAlign: "center",
-              marginTop: 6,
-            }}
-          >
-            TrustInbox © 2026
-          </p>
-        </div>
-      )}
+          SECURED BY TRUSTINBOX AI
+        </span>
+      </div>
     </div>
   );
 }

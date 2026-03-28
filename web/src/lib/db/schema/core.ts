@@ -19,6 +19,8 @@ export const history = sqliteTable("history", {
   senderEmail: text("sender"),
   emailSubject: text("emailSubject"),
   emailBody: text("emailBody"),
+  links: text("links"),
+  createdAt: integer("createdAt").notNull().$defaultFn(() => Date.now()),
   attachmentCount: integer("attachmentCount").notNull().default(0),
   llmPrediction: text("llm_prediction").notNull(),
   dnsLookupResult: text("dns_lookup_result"),
