@@ -22,4 +22,10 @@ export const otp = pgTable("otp", {
   expiresAt: timestamp("expiresAt").notNull(),
 });
 
+export const predictions = pgTable("predictions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("userId").notNull(),
+
+});
+
 export type User = typeof user.$inferSelect;
